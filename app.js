@@ -45,10 +45,10 @@ var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Spei
 var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v9 · 15.08.2026';
+var APP_VERSION='v10 · 15.08.2026';
 /* Kennzeichen des Excel-Stands. Wird nach dem einmaligen Übernehmen in den
    Einstellungen vermerkt, damit es nicht bei jedem Start erneut passiert. */
-var XL_STAND='martin-arbeitszeit-bezahlt-bis-2026-07';
+var XL_STAND='martin-arbeitszeit-bezahlt-bis-2026-07-25';
 
 var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
 
@@ -868,7 +868,7 @@ function banners(){
   if(ui.xlNeu||ui.xlAkt) h+='<div class="banner banner-ok"><b>'
     +(ui.xlNeu?ui.xlNeu+' Arbeitszeiten übernommen.':'Zahlungsstand aktualisiert.')+'</b> '
     +(ui.xlNeu?'Alle Zeilen für Martin aus der Excel-Liste, Juni 2025 bis August 2026. ':'')
-    +(ui.xlAkt?ui.xlAkt+' Zeilen bis Juli 2026 als bezahlt gebucht. ':'')
+    +(ui.xlAkt?ui.xlAkt+' Zeilen bis zum 25.07.2026 als bezahlt gebucht. ':'')
     +'<button class="linkbtn" style="color:inherit" onclick="A.xlWeg()">Verstanden</button></div>';
   if(ui.saveErr) h+='<div class="banner">Speichern fehlgeschlagen. Bitte lade sofort eine Sicherung herunter.</div>';
   if(ui.legacyOffen) h+='<div class="banner banner-warn">Deine bisherigen Daten wurden übernommen und verschlüsselt. '

@@ -338,11 +338,21 @@ Außerdem korrigiert: im Blatt „Mai Juni 2026" stand bei einer Zeile das Datum
 **2025**-05-26 zwischen lauter 2026er Zeilen; sie wurde als **2026**-05-26
 übernommen.
 
-**Zahlungen:** Bis einschließlich **Juli 2026 gilt alles als beglichen** – je
-Monat eine Abrechnung über den vollen Monatsbetrag. Maßgeblich ist der
-Summenbetrag, nicht die im Blatt notierten Teilzahlungen; deren Wortlaut steht
-als Notiz an der jeweiligen Abrechnung. Offen bleibt allein der **August 2026**
-mit 67,08 €.
+**Zahlungen:** Alles **vor dem 25.07.2026 gilt als beglichen** – je Monat eine
+Abrechnung über den vollen Betrag. Maßgeblich ist der Summenbetrag, nicht die
+im Blatt notierten Teilzahlungen; deren Wortlaut steht als Notiz an der
+jeweiligen Abrechnung.
+
+**Offen sind die 10 Zeilen ab dem 25.07.2026** – zusammen **469,57 €**, also
+genau der Summenbetrag des Blattes „August 2026":
+
+| Datum | Zeilen | Betrag |
+|---|---:|---:|
+| 25.07.2026 | 3 | 92,25 € |
+| 26.07.2026 | 1 | 49,83 € |
+| 31.07.2026 | 4 | 260,40 € |
+| 06.08.2026 | 1 | 42,17 € |
+| 11.08.2026 | 1 | 24,92 € |
 
 Damit gilt auch die oben genannte Juni-2026-Differenz von 118,29 € als bezahlt.
 Wer sie gegenüber Martin geltend machen will, nimmt bei den betroffenen Zeilen
