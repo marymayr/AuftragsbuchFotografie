@@ -45,6 +45,7 @@ var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Spei
 var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
+var APP_VERSION='v6 · 15.08.2026';
 
 var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
 
@@ -620,6 +621,26 @@ function saveSettingsForm(){
 function openBackup(){ui.sheet='backup';render();}
 function openRestore(){ui.sheet='restore';render();}
 function openTrash(){ui.sheet='trash';render();}
+
+/* Offline-Zwischenspeicher leeren und neu laden. Die Einträge liegen im
+   localStorage und bleiben davon unberührt – nur die Programmdateien
+   werden frisch geholt. */
+function aktualisieren(){
+  var b=document.getElementById('updbtn');
+  if(b){ b.textContent='Wird geholt …'; b.disabled=true; }
+  var neuLaden=function(){ location.reload(); };
+  if(!('caches' in window)) return neuLaden();
+  caches.keys()
+    .then(function(ks){ return Promise.all(ks.map(function(k){ return caches.delete(k); })); })
+    .then(function(){
+      return ('serviceWorker' in navigator)
+        ? navigator.serviceWorker.getRegistrations().then(function(rs){
+            return Promise.all(rs.map(function(r){ return r.unregister(); }));
+          })
+        : null;
+    })
+    .then(neuLaden).catch(neuLaden);
+}
 function pickFile(){var i=document.getElementById('fileimp');if(i)i.click();}
 
 function backupObjekt(){
@@ -1276,6 +1297,11 @@ function sheetSettings(){
     +'<button class="linkbtn" onclick="A.openBackup()">Sicherung</button>'
     +'<button class="linkbtn" onclick="A.openPw()">Passwort ändern</button>'
     +'<button class="linkbtn" style="color:var(--red)" onclick="A.openReset()">Alles löschen</button></div>';
+  b+='<div class="ctr" style="margin-top:22px"><div class="hint" style="margin-bottom:8px">Fassung '
+    +esc(APP_VERSION)+'</div>'
+    +'<button class="btn btn-line btn-sm" id="updbtn" onclick="A.aktualisieren()">Auf neue Fassung prüfen</button>'
+    +'<div class="hint" style="margin-top:8px">Holt die Programmdateien frisch vom Server. '
+    +'Deine Einträge bleiben dabei unangetastet.</div></div>';
   var acts='<div class="acts"><button class="btn btn-fill" onclick="A.saveSettingsForm()">Speichern</button></div>';
   return shell('Sätze &amp; Einstellungen',b,acts);
 }
@@ -1753,7 +1779,7 @@ window.A={
   openBackup:openBackup,copyBackup:copyBackup,exportJSON:exportJSON,exportCSV:exportCSV,
   openRestore:openRestore,applyRestore:applyRestore,importDatei:importDatei,pickFile:pickFile,
   importExcel:importExcel,toggleBeleg:toggleBeleg,
-  openTrash:openTrash,legacyEntfernen:legacyEntfernen,
+  openTrash:openTrash,legacyEntfernen:legacyEntfernen,aktualisieren:aktualisieren,
   openReset:openReset,checkWipe:checkWipe,doWipe:doWipe,
   openPw:openPw,changePw:changePw,setPw:setPw,checkPw:checkPw,
   openReport:openReport,repChange:repChange,showReport:showReport,closeReport:closeReport

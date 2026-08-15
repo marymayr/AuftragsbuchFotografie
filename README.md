@@ -332,5 +332,17 @@ teilweise bezahlt war, sind die ältesten Zeilen als bezahlt markiert, bis der
 gezahlte Betrag gedeckt ist – der Rest bleibt offen. Jede Zeile lässt sich über
 das Häkchen einzeln umstellen.
 
-Nach einer Änderung an den Dateien die Version in `sw.js` (`CACHE`) hochzählen,
-damit installierte Geräte die neue Fassung laden.
+### Aktualisierungen
+
+Der Service Worker holt Programmdateien **zuerst aus dem Netz** und nutzt den
+Zwischenspeicher nur als Rückfall, wenn gerade keine Verbindung besteht. Eine
+neue Fassung ist damit schon beim nächsten Öffnen da. (Umgekehrt – erst Cache,
+dann Netz – bekäme man nach jeder Änderung noch einmal die alte Fassung zu
+sehen.) Symbole kommen weiterhin aus dem Zwischenspeicher, die ändern sich nicht.
+
+Unter *Sätze & Einstellungen* stehen ganz unten die laufende **Fassung** und der
+Knopf **„Auf neue Fassung prüfen"**. Er leert den Offline-Zwischenspeicher und
+lädt neu; die Einträge im verschlüsselten Speicher bleiben unangetastet.
+
+Nach einer Änderung an den Dateien die Version in `sw.js` (`CACHE`) und
+`APP_VERSION` in `app.js` hochzählen.
