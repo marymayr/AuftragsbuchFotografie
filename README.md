@@ -338,10 +338,15 @@ Außerdem korrigiert: im Blatt „Mai Juni 2026" stand bei einer Zeile das Datum
 **2025**-05-26 zwischen lauter 2026er Zeilen; sie wurde als **2026**-05-26
 übernommen.
 
-Die Zahlungen der Blätter sind als Abrechnungen hinterlegt. Wo ein Blatt nur
-teilweise bezahlt war, sind die ältesten Zeilen als bezahlt markiert, bis der
-gezahlte Betrag gedeckt ist – der Rest bleibt offen. Jede Zeile lässt sich über
-das Häkchen einzeln umstellen.
+**Zahlungen:** Bis einschließlich **Juli 2026 gilt alles als beglichen** – je
+Monat eine Abrechnung über den vollen Monatsbetrag. Maßgeblich ist der
+Summenbetrag, nicht die im Blatt notierten Teilzahlungen; deren Wortlaut steht
+als Notiz an der jeweiligen Abrechnung. Offen bleibt allein der **August 2026**
+mit 67,08 €.
+
+Damit gilt auch die oben genannte Juni-2026-Differenz von 118,29 € als bezahlt.
+Wer sie gegenüber Martin geltend machen will, nimmt bei den betroffenen Zeilen
+das Häkchen wieder heraus – dann erscheinen sie erneut als offen.
 
 ### Aktualisierungen
 

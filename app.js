@@ -45,10 +45,10 @@ var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Spei
 var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v8 · 15.08.2026';
+var APP_VERSION='v9 · 15.08.2026';
 /* Kennzeichen des Excel-Stands. Wird nach dem einmaligen Übernehmen in den
    Einstellungen vermerkt, damit es nicht bei jedem Start erneut passiert. */
-var XL_STAND='martin-arbeitszeit-2026-08-15';
+var XL_STAND='martin-arbeitszeit-bezahlt-bis-2026-07';
 
 var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
 
@@ -57,7 +57,7 @@ var ui={
   sheet:null, editId:null, settleScope:null,
   sucheAn:false, suche:'', fArt:'', fStatus:'',
   fArea:'martin', fArt2:'fotografisch', fModus:'regulaer', fTime:'range', fBilling:'fix',
-  errs:{}, draft:{}, saveErr:false, legacyOffen:false, xlNeu:0,
+  errs:{}, draft:{}, saveErr:false, legacyOffen:false, xlNeu:0, xlAkt:0,
   repBereich:'martin', repUmfang:'monat', repJahr:'', repMonat:'', repOffen:false
 };
 
@@ -735,26 +735,36 @@ function applyRestore(){
 /* Beim ersten Start die Arbeitszeiten aus der Excel-Liste selbst übernehmen.
    Es wird ausschließlich ergänzt – vorhandene oder in den Papierkorb gelegte
    Einträge bleiben unangetastet. Danach merkt sich die App den Stand. */
+/* Abrechnungen einer früheren Übernahme wegräumen, damit sie sich nicht
+   mit den neuen doppeln. Eigene Abrechnungen bleiben unangetastet. */
+function xlAltEntfernen(){
+  payments=payments.filter(function(p){ return String(p.id).indexOf('xlp')!==0; });
+}
+
 function autoImport(){
   if(settings.xlStand===XL_STAND) return;
   fetch(IMPORT_DATEI,{cache:'no-store'})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(d){
-      var vorh={}; entries.forEach(function(e){ vorh[e.id]=1; });
-      var neu=0;
+      xlAltEntfernen();
+      var vorh={}; entries.forEach(function(e){ vorh[e.id]=e; });
+      var neu=0, akt=0;
       (d.entries||[]).map(normEntry).forEach(function(e){
-        if(!vorh[e.id]){ entries.push(e); neu++; }
+        var a=vorh[e.id];
+        if(!a){ entries.push(e); neu++; return; }
+        if(a.geloescht) return;                 // im Papierkorb bleibt im Papierkorb
+        if(a.paid!==e.paid){ akt++; }
+        a.paid=e.paid; a.payment=e.payment;     // nur den Zahlungsstand nachziehen
       });
-      var pv={}; payments.forEach(function(p){ pv[p.id]=1; });
-      (d.payments||[]).forEach(function(p){ if(p&&p.id&&!pv[p.id]) payments.push(p); });
+      (d.payments||[]).forEach(function(p){ if(p&&p.id) payments.push(p); });
       settings.xlStand=XL_STAND;
-      ui.xlNeu=neu;
+      ui.xlNeu=neu; ui.xlAkt=akt;
       render();
-      if(neu) save();
+      save();
     })
     .catch(function(){ /* ohne Verbindung oder lokal geöffnet: der Knopf bleibt */ });
 }
-function xlWeg(){ ui.xlNeu=0; render(); }
+function xlWeg(){ ui.xlNeu=0; ui.xlAkt=0; render(); }
 
 /* Die aus Martin_Arbeitszeit.xlsx erzeugte Sicherung liegt neben der App. */
 function importExcel(){
@@ -763,6 +773,7 @@ function importExcel(){
   fetch(IMPORT_DATEI,{cache:'no-store'})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(d){
+      if(d&&d.stand) xlAltEntfernen();
       if(mergeDaten(d,'der Excel-Liste „Martin Arbeitszeit“')){
         settings.xlStand=XL_STAND; ui.sheet=null; render(); save();
       }
@@ -854,8 +865,10 @@ function cameraSVG(){
 
 function banners(){
   var h='';
-  if(ui.xlNeu) h+='<div class="banner banner-ok"><b>'+ui.xlNeu+' Arbeitszeiten übernommen.</b> '
-    +'Alle Zeilen für Martin aus der Excel-Liste, Juni 2025 bis August 2026. '
+  if(ui.xlNeu||ui.xlAkt) h+='<div class="banner banner-ok"><b>'
+    +(ui.xlNeu?ui.xlNeu+' Arbeitszeiten übernommen.':'Zahlungsstand aktualisiert.')+'</b> '
+    +(ui.xlNeu?'Alle Zeilen für Martin aus der Excel-Liste, Juni 2025 bis August 2026. ':'')
+    +(ui.xlAkt?ui.xlAkt+' Zeilen bis Juli 2026 als bezahlt gebucht. ':'')
     +'<button class="linkbtn" style="color:inherit" onclick="A.xlWeg()">Verstanden</button></div>';
   if(ui.saveErr) h+='<div class="banner">Speichern fehlgeschlagen. Bitte lade sofort eine Sicherung herunter.</div>';
   if(ui.legacyOffen) h+='<div class="banner banner-warn">Deine bisherigen Daten wurden übernommen und verschlüsselt. '

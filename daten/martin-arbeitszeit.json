@@ -1,7 +1,8 @@
 {
  "format": "auftragsbuch",
  "schema": 4,
- "exportiert": "2026-08-15T20:30:48.725689+00:00",
+ "stand": "bezahlt-bis-2026-07",
+ "exportiert": "2026-08-15T21:09:27.550727+00:00",
  "quelle": "Martin_Arbeitszeit.xlsx",
  "entries": [
   {
@@ -16,15 +17,15 @@
    "notiz": "Standesamtliche Trauung im Spiegelsaal Eichstätt // 250 - 300 Fotos max.",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-19T12:00:00.000Z",
-   "bearbeitet": "2025-06-19T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 2,
    "durM": 0
@@ -41,15 +42,15 @@
    "notiz": "Kirchliche Trauung in Buch und anschließender Feier im Baderwirt in Langenmosen",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-21T12:00:00.000Z",
-   "bearbeitet": "2025-06-21T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:30",
    "end": "11:00"
@@ -66,15 +67,15 @@
    "notiz": "Kirchliche Trauung in Buch und anschließender Feier im Baderwirt in Langenmosen",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-21T12:00:00.000Z",
-   "bearbeitet": "2025-06-21T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 0,
    "durM": 0
@@ -91,15 +92,15 @@
    "notiz": "Kirchliche Trauung in Buch und anschließender Feier im Baderwirt in Langenmosen",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-21T12:00:00.000Z",
-   "bearbeitet": "2025-06-21T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "11:00",
    "end": "15:35"
@@ -116,15 +117,15 @@
    "notiz": "",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-21T12:00:00.000Z",
-   "bearbeitet": "2025-06-21T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "15:35",
    "end": "16:20"
@@ -141,15 +142,15 @@
    "notiz": "",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-21T12:00:00.000Z",
-   "bearbeitet": "2025-06-21T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 0,
    "durM": 0
@@ -166,15 +167,15 @@
    "notiz": "",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-21T12:00:00.000Z",
-   "bearbeitet": "2025-06-21T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "16:20",
    "end": "19:20"
@@ -191,15 +192,15 @@
    "notiz": "Eigentlich 51 aber Reduziert auf insgesamt",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-21T12:00:00.000Z",
-   "bearbeitet": "2025-06-21T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 0,
    "durM": 0
@@ -216,15 +217,15 @@
    "notiz": "Besprochen: Bearbeitung, Ich schreibe zukünftig immer einen Kommentar, wenn ich ein Foto haben möchte, dann lädt er mir die Dateien im RAW-Format hoch",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-25T12:00:00.000Z",
-   "bearbeitet": "2025-06-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "16:50",
    "end": "18:15"
@@ -241,15 +242,15 @@
    "notiz": "",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 217.64,
     "method": "Überweisung und Bar",
     "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+    "batch": "xlp-2025-06"
    },
    "geloescht": false,
    "erstellt": "2025-06-19T12:00:00.000Z",
-   "bearbeitet": "2025-06-19T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 0,
    "durM": 30
@@ -266,15 +267,15 @@
    "notiz": "10 - 12 Stunden Begleitung",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 430.0,
     "method": "Überweisung und Bar",
-    "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "date": "2025-10-01",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
    },
    "geloescht": false,
    "erstellt": "2025-07-04T12:00:00.000Z",
-   "bearbeitet": "2025-07-04T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "21:25"
@@ -291,15 +292,15 @@
    "notiz": "Freie Trauung 11 Stunden Begleitung am  13.07. - 3000€ ca für Martin",
    "paid": true,
    "payment": {
-    "amount": 360.0,
+    "amount": 430.0,
     "method": "Überweisung und Bar",
-    "date": "2025-07-25",
-    "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-    "batch": "xlp00"
+    "date": "2025-10-01",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
    },
    "geloescht": false,
    "erstellt": "2025-07-08T12:00:00.000Z",
-   "bearbeitet": "2025-07-08T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "17:05",
    "end": "19:20"
@@ -314,11 +315,17 @@
    "was": "Aussortieren Hochzeitsgalerie",
    "name": "Carina und Dominik (Buch)",
    "notiz": "",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 430.0,
+    "method": "Überweisung und Bar",
+    "date": "2025-10-01",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
+   },
    "geloescht": false,
    "erstellt": "2025-07-11T12:00:00.000Z",
-   "bearbeitet": "2025-07-11T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "21:15"
@@ -335,15 +342,15 @@
    "notiz": "Ausschank bei Fa. Kügel GmbH - 160 Pers. / 4 Servicekräfte / ca. 300 Spritzer verkauft",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 430.0,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
    },
    "geloescht": false,
    "erstellt": "2025-07-25T12:00:00.000Z",
-   "bearbeitet": "2025-07-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "16:05",
    "end": "17:00"
@@ -360,15 +367,15 @@
    "notiz": "Ausschank bei Fa. Kügel GmbH - 160 Pers. / 4 Servicekräfte / ca. 300 Spritzer verkauft",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 430.0,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
    },
    "geloescht": false,
    "erstellt": "2025-07-25T12:00:00.000Z",
-   "bearbeitet": "2025-07-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "17:00",
    "end": "00:40"
@@ -385,15 +392,15 @@
    "notiz": "Hochzeit bei der ich Hauptfotograf hätte sein sollen - Standesamtliche Trauung in Ingolstadt, Weiterfahrt und Feier beim Beckerwirt in Böhmfeld - Brautpaar ca. Mitte 50, Feier mit 20 Personen",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 430.0,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
    },
    "geloescht": false,
    "erstellt": "2025-07-26T12:00:00.000Z",
-   "bearbeitet": "2025-07-26T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "09:45",
    "end": "10:20"
@@ -410,15 +417,15 @@
    "notiz": "Hochzeit bei der ich Hauptfotograf hätte sein sollen - Standesamtliche Trauung in Ingolstadt, Weiterfahrt und Feier beim Beckerwirt in Böhmfeld - Brautpaar ca. Mitte 50, Feier mit 20 Personen",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 430.0,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
    },
    "geloescht": false,
    "erstellt": "2025-07-26T12:00:00.000Z",
-   "bearbeitet": "2025-07-26T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:20",
    "end": "15:45"
@@ -435,15 +442,15 @@
    "notiz": "8 - 9h Begleitet von Martin in der Schubauers Tenne",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 430.0,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-07"
    },
    "geloescht": false,
    "erstellt": "2025-07-28T12:00:00.000Z",
-   "bearbeitet": "2025-07-28T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "20:45"
@@ -460,15 +467,15 @@
    "notiz": "Nur fotografische Begleitung der Party in der Kaltmühle (Münchener Norden)",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 155.31,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-08"
    },
    "geloescht": false,
    "erstellt": "2025-08-02T12:00:00.000Z",
-   "bearbeitet": "2025-08-02T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "14:20",
    "end": "15:15"
@@ -485,15 +492,15 @@
    "notiz": "Nur fotografische Begleitung der Party in der Kaltmühle (Münchener Norden)",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 155.31,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-08"
    },
    "geloescht": false,
    "erstellt": "2025-08-02T12:00:00.000Z",
-   "bearbeitet": "2025-08-02T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "15:15",
    "end": "20:40"
@@ -510,15 +517,15 @@
    "notiz": "",
    "paid": true,
    "payment": {
-    "amount": 408.75,
+    "amount": 155.31,
     "method": "Überweisung und Bar",
     "date": "2025-10-01",
-    "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
-    "batch": "xlp01"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-08"
    },
    "geloescht": false,
    "erstellt": "2025-08-08T12:00:00.000Z",
-   "bearbeitet": "2025-08-08T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "15:00",
    "end": "15:50"
@@ -535,15 +542,15 @@
    "notiz": "6 Stunden mit Martin vor Ort gewesen (RAW Bilder ausgesucht)",
    "paid": true,
    "payment": {
-    "amount": 118.13,
-    "method": "Banküberweisung",
-    "date": "2025-09-23",
-    "note": "Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
-    "batch": "xlp02"
+    "amount": 155.31,
+    "method": "Überweisung und Bar",
+    "date": "2025-10-01",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+    "batch": "xlp-2025-08"
    },
    "geloescht": false,
    "erstellt": "2025-08-27T12:00:00.000Z",
-   "bearbeitet": "2025-08-27T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "08:30",
    "end": "10:40"
@@ -560,15 +567,15 @@
    "notiz": "Martin 9h vor Ort in der alten Gärtnerei",
    "paid": true,
    "payment": {
-    "amount": 118.13,
+    "amount": 137.08,
     "method": "Banküberweisung",
     "date": "2025-09-23",
-    "note": "Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
-    "batch": "xlp02"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
+    "batch": "xlp-2025-09"
    },
    "geloescht": false,
    "erstellt": "2025-09-04T12:00:00.000Z",
-   "bearbeitet": "2025-09-04T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "15:00",
    "end": "17:20"
@@ -585,15 +592,15 @@
    "notiz": "Martin 9h vor Ort",
    "paid": true,
    "payment": {
-    "amount": 118.13,
+    "amount": 137.08,
     "method": "Banküberweisung",
     "date": "2025-09-23",
-    "note": "Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
-    "batch": "xlp02"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
+    "batch": "xlp-2025-09"
    },
    "geloescht": false,
    "erstellt": "2025-09-12T12:00:00.000Z",
-   "bearbeitet": "2025-09-12T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "14:00",
    "end": "16:15"
@@ -610,15 +617,15 @@
    "notiz": "3 Stunden vor Ort im Sportheim Zuchering, für Martin übernommen ab 19.20 Uhr ca alleine. Rumänische Hochzeit",
    "paid": true,
    "payment": {
-    "amount": 318.2,
+    "amount": 137.08,
     "method": "Banküberweisung",
-    "date": "2025-10-27",
-    "note": "Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
-    "batch": "xlp03"
+    "date": "2025-09-23",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
+    "batch": "xlp-2025-09"
    },
    "geloescht": false,
    "erstellt": "2025-09-28T12:00:00.000Z",
-   "bearbeitet": "2025-09-28T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "21:05"
@@ -635,15 +642,15 @@
    "notiz": "3 Stunden vor Ort im Sportheim Zuchering, für Martin übernommen ab 19.20 Uhr ca alleine. Rumänische Hochzeit",
    "paid": true,
    "payment": {
-    "amount": 318.2,
+    "amount": 137.08,
     "method": "Banküberweisung",
-    "date": "2025-10-27",
-    "note": "Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
-    "batch": "xlp03"
+    "date": "2025-09-23",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
+    "batch": "xlp-2025-09"
    },
    "geloescht": false,
    "erstellt": "2025-09-28T12:00:00.000Z",
-   "bearbeitet": "2025-09-28T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "17:40",
    "end": "18:00"
@@ -660,15 +667,15 @@
    "notiz": "Vogelsang Weichering (Gratulation, Brautverziehen etc.)",
    "paid": true,
    "payment": {
-    "amount": 318.2,
+    "amount": 527.67,
     "method": "Banküberweisung",
     "date": "2025-10-27",
-    "note": "Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
-    "batch": "xlp03"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
    },
    "geloescht": false,
    "erstellt": "2025-10-04T12:00:00.000Z",
-   "bearbeitet": "2025-10-04T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:55",
    "end": "13:15"
@@ -685,15 +692,15 @@
    "notiz": "Vogelsang Weichering (Gratulation, Brautverziehen etc.)",
    "paid": true,
    "payment": {
-    "amount": 318.2,
+    "amount": 527.67,
     "method": "Banküberweisung",
     "date": "2025-10-27",
-    "note": "Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
-    "batch": "xlp03"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
    },
    "geloescht": false,
    "erstellt": "2025-10-04T12:00:00.000Z",
-   "bearbeitet": "2025-10-04T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "13:15",
    "end": "21:25"
@@ -710,15 +717,15 @@
    "notiz": "4800 Fotos",
    "paid": true,
    "payment": {
-    "amount": 318.2,
+    "amount": 527.67,
     "method": "Banküberweisung",
     "date": "2025-10-27",
-    "note": "Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
-    "batch": "xlp03"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
    },
    "geloescht": false,
    "erstellt": "2025-10-12T12:00:00.000Z",
-   "bearbeitet": "2025-10-12T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "08:00",
    "end": "10:50"
@@ -735,15 +742,15 @@
    "notiz": "2800 Fotos",
    "paid": true,
    "payment": {
-    "amount": 318.2,
+    "amount": 527.67,
     "method": "Banküberweisung",
     "date": "2025-10-27",
-    "note": "Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
-    "batch": "xlp03"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
    },
    "geloescht": false,
    "erstellt": "2025-10-16T12:00:00.000Z",
-   "bearbeitet": "2025-10-16T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "17:00",
    "end": "18:45"
@@ -758,11 +765,17 @@
    "was": "Hochzeitsbegleitung",
    "name": "Alexa und Alex",
    "notiz": "Landsteak Haus in Marxheim",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 527.67,
+    "method": "Banküberweisung",
+    "date": "2025-10-27",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
+   },
    "geloescht": false,
    "erstellt": "2025-10-25T12:00:00.000Z",
-   "bearbeitet": "2025-10-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:00",
    "end": "21:40"
@@ -779,15 +792,15 @@
    "notiz": "Landsteak Haus in Marxheim",
    "paid": true,
    "payment": {
-    "amount": 155.0,
+    "amount": 527.67,
     "method": "Banküberweisung",
-    "date": "2025-11-25",
-    "note": "Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
-    "batch": "xlp04"
+    "date": "2025-10-27",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
    },
    "geloescht": false,
    "erstellt": "2025-10-25T12:00:00.000Z",
-   "bearbeitet": "2025-10-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "11:20",
    "end": "12:00"
@@ -804,15 +817,15 @@
    "notiz": "Landsteak Haus in Marxheim",
    "paid": true,
    "payment": {
-    "amount": 155.0,
+    "amount": 527.67,
     "method": "Banküberweisung",
-    "date": "2025-11-25",
-    "note": "Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
-    "batch": "xlp04"
+    "date": "2025-10-27",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
    },
    "geloescht": false,
    "erstellt": "2025-10-25T12:00:00.000Z",
-   "bearbeitet": "2025-10-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 0,
    "durM": 0
@@ -829,15 +842,15 @@
    "notiz": "4200 Fotos",
    "paid": true,
    "payment": {
-    "amount": 155.0,
+    "amount": 527.67,
     "method": "Banküberweisung",
-    "date": "2025-11-25",
-    "note": "Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
-    "batch": "xlp04"
+    "date": "2025-10-27",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+    "batch": "xlp-2025-10"
    },
    "geloescht": false,
    "erstellt": "2025-10-26T12:00:00.000Z",
-   "bearbeitet": "2025-10-26T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "16:00",
    "end": "18:40"
@@ -854,15 +867,15 @@
    "notiz": "5070 Fotos",
    "paid": true,
    "payment": {
-    "amount": 155.0,
+    "amount": 166.67,
     "method": "Banküberweisung",
     "date": "2025-11-25",
-    "note": "Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
-    "batch": "xlp04"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
+    "batch": "xlp-2025-11"
    },
    "geloescht": false,
    "erstellt": "2025-11-04T12:00:00.000Z",
-   "bearbeitet": "2025-11-04T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "15:00",
    "end": "18:05"
@@ -877,11 +890,17 @@
    "was": "Hochzeitsgalerie aussortiert",
    "name": "Lisa und Stefan",
    "notiz": "3300 Fotos",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 166.67,
+    "method": "Banküberweisung",
+    "date": "2025-11-25",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
+    "batch": "xlp-2025-11"
+   },
    "geloescht": false,
    "erstellt": "2025-11-12T12:00:00.000Z",
-   "bearbeitet": "2025-11-12T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "15:00",
    "end": "17:00"
@@ -896,11 +915,17 @@
    "was": "Hochzeitsgalerie aussortieren",
    "name": "Alexa und Alex",
    "notiz": "5200 Fotos",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 166.67,
+    "method": "Banküberweisung",
+    "date": "2025-11-25",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
+    "batch": "xlp-2025-11"
+   },
    "geloescht": false,
    "erstellt": "2025-11-27T12:00:00.000Z",
-   "bearbeitet": "2025-11-27T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:00",
    "end": "15:15"
@@ -920,12 +945,12 @@
     "amount": 155.0,
     "method": "unbekannt",
     "date": "2026-02-28",
-    "note": "Laut Blatt nur mit „bez.\" vermerkt, ohne Betrag und Datum.",
-    "batch": "xlp06"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt nur mit „bez.\" vermerkt, ohne Betrag und Datum.",
+    "batch": "xlp-2026-02"
    },
    "geloescht": false,
    "erstellt": "2026-02-22T12:00:00.000Z",
-   "bearbeitet": "2026-02-22T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:00",
    "end": "17:35"
@@ -945,12 +970,12 @@
     "amount": 155.0,
     "method": "unbekannt",
     "date": "2026-02-28",
-    "note": "Laut Blatt nur mit „bez.\" vermerkt, ohne Betrag und Datum.",
-    "batch": "xlp06"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt nur mit „bez.\" vermerkt, ohne Betrag und Datum.",
+    "batch": "xlp-2026-02"
    },
    "geloescht": false,
    "erstellt": "2026-02-22T12:00:00.000Z",
-   "bearbeitet": "2026-02-22T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "09:40",
    "end": "10:00"
@@ -967,15 +992,15 @@
    "notiz": "",
    "paid": true,
    "payment": {
-    "amount": 100.0,
+    "amount": 76.67,
     "method": "unbekannt",
     "date": "2026-05-04",
-    "note": "Laut Blatt: bezahlt am 04.05.2026 – 100 €.",
-    "batch": "xlp07"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: bezahlt am 04.05.2026 – 100 €.",
+    "batch": "xlp-2026-04"
    },
    "geloescht": false,
    "erstellt": "2026-04-09T12:00:00.000Z",
-   "bearbeitet": "2026-04-09T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "15:40",
    "end": "17:30"
@@ -992,15 +1017,15 @@
    "notiz": "3800 Fotos",
    "paid": true,
    "payment": {
-    "amount": 100.0,
+    "amount": 76.67,
     "method": "unbekannt",
     "date": "2026-05-04",
-    "note": "Laut Blatt: bezahlt am 04.05.2026 – 100 €.",
-    "batch": "xlp07"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: bezahlt am 04.05.2026 – 100 €.",
+    "batch": "xlp-2026-04"
    },
    "geloescht": false,
    "erstellt": "2026-04-18T12:00:00.000Z",
-   "bearbeitet": "2026-04-18T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "09:00",
    "end": "11:00"
@@ -1017,15 +1042,15 @@
    "notiz": "17.000 Fotos",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 211.67,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-05"
    },
    "geloescht": false,
    "erstellt": "2026-05-18T12:00:00.000Z",
-   "bearbeitet": "2026-05-18T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "00:00",
    "end": "07:40"
@@ -1042,15 +1067,15 @@
    "notiz": "2500 Fotos",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 211.67,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-05"
    },
    "geloescht": false,
    "erstellt": "2026-05-22T12:00:00.000Z",
-   "bearbeitet": "2026-05-22T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "19:15"
@@ -1067,15 +1092,15 @@
    "notiz": "2500 Fotos",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 211.67,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-05"
    },
    "geloescht": false,
    "erstellt": "2026-05-22T12:00:00.000Z",
-   "bearbeitet": "2026-05-22T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "18:45"
@@ -1092,15 +1117,15 @@
    "notiz": "1600 Fotos",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 211.67,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-05"
    },
    "geloescht": false,
    "erstellt": "2026-05-26T12:00:00.000Z",
-   "bearbeitet": "2026-05-26T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "18:55"
@@ -1117,15 +1142,15 @@
    "notiz": "2500 Fotos",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 751.33,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
    },
    "geloescht": false,
    "erstellt": "2026-06-05T12:00:00.000Z",
-   "bearbeitet": "2026-06-05T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "17:00",
    "end": "18:15"
@@ -1142,15 +1167,15 @@
    "notiz": "15h Begleitung",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 751.33,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
    },
    "geloescht": false,
    "erstellt": "2026-06-06T12:00:00.000Z",
-   "bearbeitet": "2026-06-06T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "07:00",
    "end": "10:30"
@@ -1165,11 +1190,17 @@
    "was": "Hochzeit Schloss Walkertshofen",
    "name": "Evelin und Patrick",
    "notiz": "15h Begleitung",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 751.33,
+    "method": "Banküberweisung",
+    "date": "2026-06-22",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
+   },
    "geloescht": false,
    "erstellt": "2026-06-07T12:00:00.000Z",
-   "bearbeitet": "2026-06-07T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "01:30",
    "end": "04:00"
@@ -1186,15 +1217,15 @@
    "notiz": "15h Begleitung",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 751.33,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
    },
    "geloescht": false,
    "erstellt": "2026-06-06T12:00:00.000Z",
-   "bearbeitet": "2026-06-06T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:30",
    "end": "23:59"
@@ -1211,15 +1242,15 @@
    "notiz": "15h Begleitung",
    "paid": true,
    "payment": {
-    "amount": 650.0,
+    "amount": 751.33,
     "method": "Banküberweisung",
     "date": "2026-06-22",
-    "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-    "batch": "xlp08"
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
    },
    "geloescht": false,
    "erstellt": "2026-06-07T12:00:00.000Z",
-   "bearbeitet": "2026-06-07T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "00:00",
    "end": "01:31"
@@ -1234,11 +1265,17 @@
    "was": "Hochzeitsgalerie aussortieren",
    "name": "Anika und Vinc",
    "notiz": "11h Begleitung",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 751.33,
+    "method": "Banküberweisung",
+    "date": "2026-06-22",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
+   },
    "geloescht": false,
    "erstellt": "2026-06-07T12:00:00.000Z",
-   "bearbeitet": "2026-06-07T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "20:00"
@@ -1253,11 +1290,17 @@
    "was": "Hochzeitsgalerie aussortieren",
    "name": "Sophia und Johannes",
    "notiz": "10,5h BEG. 4000 Fotos",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 751.33,
+    "method": "Banküberweisung",
+    "date": "2026-06-22",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
+   },
    "geloescht": false,
    "erstellt": "2026-06-13T12:00:00.000Z",
-   "bearbeitet": "2026-06-13T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:00",
    "end": "12:25"
@@ -1272,11 +1315,17 @@
    "was": "Hochzeit Kaltmühle",
    "name": "Julia und Florian",
    "notiz": "6h Begleitung",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 751.33,
+    "method": "Banküberweisung",
+    "date": "2026-06-22",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
+   },
    "geloescht": false,
    "erstellt": "2026-06-20T12:00:00.000Z",
-   "bearbeitet": "2026-06-20T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:00",
    "end": "18:00"
@@ -1291,11 +1340,17 @@
    "was": "Hochzeit Kaltmühle",
    "name": "Julia und Florian",
    "notiz": "6h Begleitung",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 751.33,
+    "method": "Banküberweisung",
+    "date": "2026-06-22",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
+   },
    "geloescht": false,
    "erstellt": "2026-06-20T12:00:00.000Z",
-   "bearbeitet": "2026-06-20T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:30",
    "end": "12:00"
@@ -1312,15 +1367,15 @@
    "notiz": "610 Fotos",
    "paid": true,
    "payment": {
-    "amount": 178.25,
+    "amount": 751.33,
     "method": "Banküberweisung",
-    "date": "2026-07-21",
-    "note": "Laut Blatt: 178,25 € überwiesen am 21.07.2026, 75 € ausstehend (Stand 25.07.2026).",
-    "batch": "xlp09"
+    "date": "2026-06-22",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
    },
    "geloescht": false,
    "erstellt": "2026-06-23T12:00:00.000Z",
-   "bearbeitet": "2026-06-23T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:00",
    "end": "10:25"
@@ -1337,15 +1392,15 @@
    "notiz": "1400 Fotos",
    "paid": true,
    "payment": {
-    "amount": 178.25,
+    "amount": 751.33,
     "method": "Banküberweisung",
-    "date": "2026-07-21",
-    "note": "Laut Blatt: 178,25 € überwiesen am 21.07.2026, 75 € ausstehend (Stand 25.07.2026).",
-    "batch": "xlp09"
+    "date": "2026-06-22",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+    "batch": "xlp-2026-06"
    },
    "geloescht": false,
    "erstellt": "2026-06-26T12:00:00.000Z",
-   "bearbeitet": "2026-06-26T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "19:05"
@@ -1362,15 +1417,15 @@
    "notiz": "1000 Fotos",
    "paid": true,
    "payment": {
-    "amount": 178.25,
-    "method": "Banküberweisung",
-    "date": "2026-07-21",
-    "note": "Laut Blatt: 178,25 € überwiesen am 21.07.2026, 75 € ausstehend (Stand 25.07.2026).",
-    "batch": "xlp09"
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
    },
    "geloescht": false,
    "erstellt": "2026-07-11T12:00:00.000Z",
-   "bearbeitet": "2026-07-11T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "16:50",
    "end": "19:45"
@@ -1385,11 +1440,17 @@
    "was": "Hochzeitsgalerie ausortiert",
    "name": "Patrick und Evelyin",
    "notiz": "7500 Fotos",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-15T12:00:00.000Z",
-   "bearbeitet": "2026-07-15T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "10:00",
    "end": "14:45"
@@ -1406,15 +1467,15 @@
    "notiz": "2890 Fotos",
    "paid": true,
    "payment": {
-    "amount": 178.25,
-    "method": "Banküberweisung",
-    "date": "2026-07-21",
-    "note": "Laut Blatt: 178,25 € überwiesen am 21.07.2026, 75 € ausstehend (Stand 25.07.2026).",
-    "batch": "xlp09"
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
    },
    "geloescht": false,
    "erstellt": "2026-07-17T12:00:00.000Z",
-   "bearbeitet": "2026-07-17T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "18:00",
    "end": "19:50"
@@ -1429,11 +1490,17 @@
    "was": "Hochzeitsbegleitung",
    "name": "Jacqueline und Manuel",
    "notiz": "Eventtenne Pfaffenhofen",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-25T12:00:00.000Z",
-   "bearbeitet": "2026-07-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:00",
    "end": "12:30"
@@ -1448,11 +1515,17 @@
    "was": "Hochzeitsbegleitung",
    "name": "Jacqueline und Manuel",
    "notiz": "Eventtenne Pfaffenhofen",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-25T12:00:00.000Z",
-   "bearbeitet": "2026-07-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 0,
    "durM": 0
@@ -1467,11 +1540,17 @@
    "was": "Hochzeitsbegleitung",
    "name": "Jacqueline und Manuel",
    "notiz": "Eventtenne Pfaffenhofen",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-25T12:00:00.000Z",
-   "bearbeitet": "2026-07-25T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:30",
    "end": "16:00"
@@ -1486,11 +1565,17 @@
    "was": "Hochzeitsgalerie ausortiert",
    "name": "Julia und Florian",
    "notiz": "3700 Fotos",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-26T12:00:00.000Z",
-   "bearbeitet": "2026-07-26T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:20",
    "end": "14:30"
@@ -1505,11 +1590,17 @@
    "was": "Hochzeitsgalerie ausortiert",
    "name": "M und T",
    "notiz": "3100 Fotos",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-31T12:00:00.000Z",
-   "bearbeitet": "2026-07-31T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "06:00",
    "end": "07:45"
@@ -1524,11 +1615,17 @@
    "was": "Hochzeitsbegleitung",
    "name": "Ingrit und Dietmar Stehfest",
    "notiz": "Landsteakhaus Marxheim",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-31T12:00:00.000Z",
-   "bearbeitet": "2026-07-31T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "12:30",
    "end": "21:13"
@@ -1543,11 +1640,17 @@
    "was": "Hochzeitsbegleitung",
    "name": "Ingrit und Dietmar Stehfest",
    "notiz": "Landsteakhaus Marxheim",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-31T12:00:00.000Z",
-   "bearbeitet": "2026-07-31T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "11:50",
    "end": "12:30"
@@ -1562,11 +1665,17 @@
    "was": "Hochzeitsbegleitung",
    "name": "Ingrit und Dietmar Stehfest",
    "notiz": "Landsteakhaus Marxheim",
-   "paid": false,
-   "payment": null,
+   "paid": true,
+   "payment": {
+    "amount": 620.98,
+    "method": "unbekannt",
+    "date": "2026-07-31",
+    "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+    "batch": "xlp-2026-07"
+   },
    "geloescht": false,
    "erstellt": "2026-07-31T12:00:00.000Z",
-   "bearbeitet": "2026-07-31T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "duration",
    "durH": 0,
    "durM": 0
@@ -1585,7 +1694,7 @@
    "payment": null,
    "geloescht": false,
    "erstellt": "2026-08-11T12:00:00.000Z",
-   "bearbeitet": "2026-08-11T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "11:00",
    "end": "12:05"
@@ -1604,7 +1713,7 @@
    "payment": null,
    "geloescht": false,
    "erstellt": "2026-08-06T12:00:00.000Z",
-   "bearbeitet": "2026-08-06T12:00:00.000Z",
+   "bearbeitet": "2026-08-15T21:30:00.000Z",
    "timeMode": "range",
    "start": "11:00",
    "end": "12:50"
@@ -1612,111 +1721,135 @@
  ],
  "payments": [
   {
-   "id": "xlp00",
+   "id": "xlp-2025-06",
    "area": "martin",
    "month": "2025-06",
    "date": "2025-07-25",
-   "soll": 316.8,
-   "got": 360.0,
+   "soll": 217.64,
+   "got": 217.64,
    "method": "Überweisung und Bar",
-   "note": "Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
-   "count": 12,
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 150 € Überweisung am 17.07.2025, 210 € in Bar am 25.07.2025. Bearbeitung vor Ort nicht bezahlt.",
+   "count": 10,
    "single": false
   },
   {
-   "id": "xlp01",
+   "id": "xlp-2025-07",
    "area": "martin",
    "month": "2025-07",
    "date": "2025-10-01",
-   "soll": 391.35,
-   "got": 408.75,
+   "soll": 430.0,
+   "got": 430.0,
    "method": "Überweisung und Bar",
-   "note": "Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
    "count": 8,
    "single": false
   },
   {
-   "id": "xlp02",
+   "id": "xlp-2025-08",
    "area": "martin",
    "month": "2025-08",
-   "date": "2025-09-23",
-   "soll": 118.12,
-   "got": 118.13,
-   "method": "Banküberweisung",
-   "note": "Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
-   "count": 3,
-   "single": false
-  },
-  {
-   "id": "xlp03",
-   "area": "martin",
-   "month": "2025-09",
-   "date": "2025-10-27",
-   "soll": 315.21,
-   "got": 318.2,
-   "method": "Banküberweisung",
-   "note": "Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
-   "count": 6,
-   "single": false
-  },
-  {
-   "id": "xlp04",
-   "area": "martin",
-   "month": "2025-10",
-   "date": "2025-11-25",
-   "soll": 137.67,
-   "got": 155.0,
-   "method": "Banküberweisung",
-   "note": "Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
+   "date": "2025-10-01",
+   "soll": 155.31,
+   "got": 155.31,
+   "method": "Überweisung und Bar",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 358,75 € Überweisung am 22.08.2025, 50 € in Bar am 01.10.2025. Zwei Positionen waren vergessen worden.",
    "count": 4,
    "single": false
   },
   {
-   "id": "xlp06",
+   "id": "xlp-2025-09",
+   "area": "martin",
+   "month": "2025-09",
+   "date": "2025-09-23",
+   "soll": 137.08,
+   "got": 137.08,
+   "method": "Banküberweisung",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 118,13 € überwiesen am 23.09.2025.",
+   "count": 4,
+   "single": false
+  },
+  {
+   "id": "xlp-2025-10",
+   "area": "martin",
+   "month": "2025-10",
+   "date": "2025-10-27",
+   "soll": 527.67,
+   "got": 527.67,
+   "method": "Banküberweisung",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 318,20 € überwiesen am 27.10.2025.",
+   "count": 8,
+   "single": false
+  },
+  {
+   "id": "xlp-2025-11",
+   "area": "martin",
+   "month": "2025-11",
+   "date": "2025-11-25",
+   "soll": 166.67,
+   "got": 166.67,
+   "method": "Banküberweisung",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 155 € überwiesen am 25.11.2025. Die Hochzeit Alexa und Alex war vergessen worden – am 27.11. darauf hingewiesen.",
+   "count": 3,
+   "single": false
+  },
+  {
+   "id": "xlp-2026-02",
    "area": "martin",
    "month": "2026-02",
    "date": "2026-02-28",
    "soll": 155.0,
    "got": 155.0,
    "method": "unbekannt",
-   "note": "Laut Blatt nur mit „bez.\" vermerkt, ohne Betrag und Datum.",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt nur mit „bez.\" vermerkt, ohne Betrag und Datum.",
    "count": 2,
    "single": false
   },
   {
-   "id": "xlp07",
+   "id": "xlp-2026-04",
    "area": "martin",
    "month": "2026-04",
    "date": "2026-05-04",
    "soll": 76.67,
-   "got": 100.0,
+   "got": 76.67,
    "method": "unbekannt",
-   "note": "Laut Blatt: bezahlt am 04.05.2026 – 100 €.",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: bezahlt am 04.05.2026 – 100 €.",
    "count": 2,
    "single": false
   },
   {
-   "id": "xlp08",
+   "id": "xlp-2026-05",
    "area": "martin",
    "month": "2026-05",
    "date": "2026-06-22",
-   "soll": 625.67,
-   "got": 650.0,
+   "soll": 211.67,
+   "got": 211.67,
    "method": "Banküberweisung",
-   "note": "Laut Blatt: 650 € per Überweisung am 22.06.2026.",
-   "count": 8,
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+   "count": 4,
    "single": false
   },
   {
-   "id": "xlp09",
+   "id": "xlp-2026-06",
    "area": "martin",
    "month": "2026-06",
-   "date": "2026-07-21",
-   "soll": 143.75,
-   "got": 178.25,
+   "date": "2026-06-22",
+   "soll": 751.33,
+   "got": 751.33,
    "method": "Banküberweisung",
-   "note": "Laut Blatt: 178,25 € überwiesen am 21.07.2026, 75 € ausstehend (Stand 25.07.2026).",
-   "count": 4,
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt. Im Blatt notiert: Laut Blatt: 650 € per Überweisung am 22.06.2026.",
+   "count": 11,
+   "single": false
+  },
+  {
+   "id": "xlp-2026-07",
+   "area": "martin",
+   "month": "2026-07",
+   "date": "2026-07-31",
+   "soll": 620.98,
+   "got": 620.98,
+   "method": "unbekannt",
+   "note": "Vollständig beglichen – bis Juli 2026 war alles bezahlt.",
+   "count": 11,
    "single": false
   }
  ]
