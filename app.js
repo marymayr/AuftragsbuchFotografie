@@ -45,7 +45,7 @@ var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Spei
 var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v6 · 15.08.2026';
+var APP_VERSION='v7 · 15.08.2026';
 
 var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
 
@@ -246,7 +246,9 @@ function amountOf(e){
   return paidHours(e)*rateOf(e);
 }
 function anzOf(e){ return e.area==='self' ? Math.min(Number(e.anzahlung)||0, amountOf(e)) : 0; }
-function ausgOf(e){ return e.area==='self' ? (Number(e.ausgaben)||0) : 0; }
+/* Ausgaben werden im eigenen Bereich „Betriebsausgaben“ geführt, nicht
+   mehr je Auftrag. Ein alter Wert bleibt gespeichert, zählt aber nicht mehr. */
+function ausgOf(e){ return 0; }
 function offenOf(e){
   if(e.area==='ausgaben'||!zaehlt(e)||e.paid) return 0;
   return Math.max(0, amountOf(e)-anzOf(e));
@@ -289,15 +291,25 @@ function jahre(a){
   return Object.keys(s).sort().reverse();
 }
 function payFor(a,m){return payments.filter(function(p){return p.area===a&&p.month===m;});}
-var BEREICHE=['self','martin','ausgaben'];
+var BEREICHE=['self','ausgaben','martin'];
+/* Überschrift in der Bereichsansicht */
 function areaName(a){
   return a==='martin' ? 'Anstellung – Martin Slováček'
-       : a==='ausgaben' ? 'Betriebsausgaben' : 'Selbstständigkeit';
+       : a==='ausgaben' ? 'Betriebsausgaben' : 'Einnahmen';
 }
-function areaKurz(a){ return a==='martin'?'Anstellung':a==='ausgaben'?'Betriebsausgaben':'Selbstständigkeit'; }
+/* Kurzform für Auswahllisten */
+function areaKurz(a){ return a==='martin'?'Anstellung':a==='ausgaben'?'Betriebsausgaben':'Einnahmen'; }
+/* Volle Bezeichnung mit Oberpunkt – für Berichte */
+function areaLang(a){
+  return a==='martin' ? 'Anstellung · Martin Slováček'
+       : a==='ausgaben' ? 'Selbstständigkeit · Betriebsausgaben'
+       : 'Selbstständigkeit · Einnahmen';
+}
+/* Titel auf der Startseite; der Oberpunkt steht dort schon als Überschrift */
+function areaKarte(a){ return a==='martin'?'Martin Slováček':areaName(a); }
 function areaKind(a){
   return a==='martin' ? 'Arbeitszeiten & Einnahmen'
-       : a==='ausgaben' ? 'Ausgaben für die Selbstständigkeit' : 'Einnahmen & Ausgaben';
+       : a==='ausgaben' ? 'Anschaffungen & Kosten' : 'Aufträge & Honorare';
 }
 function areaFarbe(a){ return a==='martin'?'var(--martin)':a==='ausgaben'?'var(--gold)':'var(--self)'; }
 /* Für Berichte, die außerhalb der Bereichsansicht gezeichnet werden. */
@@ -506,7 +518,7 @@ function saveForm(){
     e.ort=v('f-ort').trim(); e.telefon=v('f-tel').trim(); e.email=v('f-mail').trim();
     e.was=v('f-was').trim(); e.rechnung=v('f-rech').trim();
     e.uebergabe=v('f-ueber')||UEBERGABE[0];
-    e.anzahlung=num(v('f-anz')); e.ausgaben=num(v('f-ausg'));
+    e.anzahlung=num(v('f-anz'));
     e.billing=ui.fBilling;
     if(!e.client) errs.client='Kunde fehlt';
     if(ui.fBilling==='fix'){
@@ -664,7 +676,7 @@ function copyBackup(){
 function exportCSV(){
   var head=['Bereich','Datum','Kunde / Name','Art / Kategorie','Ort / Händler','Was','Fahrzeit / regulär',
             'Beginn','Ende','Zeit','gefahrene KM','bezahlte Zeit','Satz','Betrag',
-            'Anzahlung','Ausgaben','Offen','Status','Zahlung','Fotoübergabe','Rechnungsnr',
+            'Anzahlung','Offen','Status','Zahlung','Fotoübergabe','Rechnungsnr',
             'Beleg','Kommentar'];
   var q=function(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';};
   var rows=sortEntries(alive()).map(function(e){
@@ -677,7 +689,7 @@ function exportCSV(){
       (self||aus)?'':modusLabel(e),
       e.start||'', e.end||'', aus?'':hm(rawHours(e)), kmOf(e)||'', aus?'':dec2(paidHours(e)),
       rateOf(e)?dec2(rateOf(e)):'', dec2(amountOf(e)), self?dec2(anzOf(e)):'',
-      self?dec2(ausgOf(e)):'', aus?'':dec2(offenOf(e)), self?e.status:'',
+      aus?'':dec2(offenOf(e)), self?e.status:'',
       aus?(e.zahlart||''):zahlStatus(e), self?(e.uebergabe||''):'',
       self?(e.rechnung||''):'', aus?(e.beleg?'ja':'nein'):'',
       (e.notiz||'').replace(/\s*\n\s*/g,' ')].map(q).join(';');
@@ -787,7 +799,6 @@ function liveCalc(){
     parts.push('Honorar <b>'+eur(amountOf(e))+'</b>'
       +(ui.fBilling==='hourly'?' · '+hm(paidHours(e))+' Std × '+eur(rateOf(e)):''));
     if(e.anzahlung) parts.push('Anzahlung '+eur(anzOf(e))+' · offen '+eur(offenOf(e)));
-    if(e.ausgaben) parts.push('Ergebnis '+eur(amountOf(e)-ausgOf(e))+' nach Ausgaben');
     if(e.status==='Storniert') parts.push('storniert – zählt nicht mit');
   }else{
     parts.push('Zeit '+hm(rawHours(e))+' · bezahlt '+hm(paidHours(e))+' Std');
@@ -828,11 +839,16 @@ function banners(){
 }
 
 function viewHome(){
-  var h='<div class="wrap"><div class="masthead">'
+  var h='<div class="wrap wrap-home"><div class="masthead">'
     +'<div class="mark">'+cameraSVG()+'<span class="mark-title">Auftragsbuch</span></div>'
     +'<div class="mark-rule"></div><div class="mark-sub">Aufträge · Arbeitszeit · Ausgaben</div></div>';
   h+=banners();
-  h+=BEREICHE.map(homeCard).join('');
+  h+='<div class="gruppen">'
+    +'<div class="gruppe"><div class="gruppe-t">Selbstständigkeit</div>'
+    + homeCard('self') + homeCard('ausgaben') + '</div>'
+    +'<div class="gruppe"><div class="gruppe-t">Anstellung</div>'
+    + homeCard('martin') + '</div>'
+    +'</div>';
   h+=noteStream();
   h+='<div class="homelinks">'
     +'<button class="linkbtn" onclick="A.openReport()">Bericht &amp; PDF</button>'
@@ -862,7 +878,7 @@ function homeCard(a){
   };
   return '<button class="area-card" style="--c:'+areaFarbe(a)+'" onclick="A.go(\'area\',\''+a+'\')">'
     +'<span class="chev">›</span>'
-    +'<div class="area-name">'+esc(areaName(a))+'</div><div class="area-kind">'+esc(areaKind(a))+'</div>'
+    +'<div class="area-name">'+esc(areaKarte(a))+'</div><div class="area-kind">'+esc(areaKind(a))+'</div>'
     +zeile(mMini(m)+' '+String(y).slice(2), sM)
     +zeile('Jahr '+y, sJ)
     +'</button>';
@@ -987,7 +1003,8 @@ function jahrHTML(a){
        ['Ohne Beleg',eur(s.ohneBeleg)],['Ø je Posten',eur(s.n?s.betrag/s.n:0)],
        ['Größter Posten',eur(Math.max.apply(null,[0].concat(es.map(amountOf))))]]
     : [['Aufträge',String(s.nRel)+(s.storno?' +'+s.storno+' storno':'')],['Honorar',eur(s.betrag)],
-       ['Anzahlungen',eur(s.anzahlung)],['Offen',eur(s.offen)],['Ausgaben',eur(s.ausgaben)],['Ergebnis',eur(s.ergebnis)]];
+       ['Anzahlungen',eur(s.anzahlung)],['Bereits bezahlt',eur(s.betrag-s.offen)],['Offen',eur(s.offen)],
+       ['Ø je Auftrag',eur(s.nRel?s.betrag/s.nRel:0)]];
 
   var h='<div class="ledger"><div class="ledger-head"><span class="label">Jahr '+y+'</span>'
     +'<span class="label">'+nStk(s.n,wortFuer(a)[0],wortFuer(a)[1])+'</span></div>'
@@ -1104,7 +1121,8 @@ function sumbar(a,es){
     : a==='ausgaben'
     ? [['Posten',String(s.n)],['Mit Beleg',eur0(s.belegt)],['Ohne Beleg',eur0(s.ohneBeleg),s.ohneBeleg?'var(--red)':''],
        ['Ø Posten',eur0(s.n?s.betrag/s.n:0)]]
-    : [['Aufträge',String(s.nRel)],['Anzahlung',eur0(s.anzahlung)],['Ausgaben',eur0(s.ausgaben)],['Offen',eur0(s.offen),s.offen?'var(--red)':'']];
+    : [['Aufträge',String(s.nRel)],['Anzahlung',eur0(s.anzahlung)],
+       ['Bezahlt',eur0(s.betrag-s.offen)],['Offen',eur0(s.offen),s.offen?'var(--red)':'']];
   return '<div class="sumbar"><div class="sumgrid">'
     +zellen.map(function(z){
       return '<div class="sumcell"><div class="stat-k">'+esc(z[0])+'</div>'
@@ -1113,8 +1131,6 @@ function sumbar(a,es){
     +'</div><div class="total-row"><span class="label">'
     +(a==='self'?'Honorar':a==='ausgaben'?'Ausgaben':'Summe')+'</span>'
     +'<span class="total-v num">'+eur(s.betrag)+'</span></div>'
-    +(a==='self'&&s.ausgaben?'<div class="total-row" style="margin-top:6px;padding-top:6px">'
-      +'<span class="label">Ergebnis nach Ausgaben</span><span class="stat-v num">'+eur(s.ergebnis)+'</span></div>':'')
     +'</div>';
 }
 
@@ -1235,10 +1251,8 @@ function sheetForm(){
         +(errs.rate?'<div class="err">'+errs.rate+'</div>':'');
     }
     b+='</div>';
-    b+='<div class="two"><div class="f"><label>Anzahlung (€)</label>'
-      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-anz" value="'+g('anz','anzahlung')+'" oninput="A.liveCalc()"></div>'
-      +'<div class="f"><label>Ausgaben (€)</label>'
-      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-ausg" value="'+g('ausg','ausgaben')+'" oninput="A.liveCalc()"></div></div>';
+    b+='<div class="f"><label>Anzahlung (€)</label>'
+      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-anz" value="'+g('anz','anzahlung')+'" oninput="A.liveCalc()"></div>';
     b+='<div class="f"><label>Was</label><input type="text" id="f-was" value="'+esc(g('was','was'))+'" placeholder="z. B. Fotografische Begleitung"></div>';
     b+='<div class="f"><label>Ort</label><input type="text" id="f-ort" value="'+esc(g('ort','ort'))+'" placeholder="z. B. Schlosshof Aichach"></div>';
     b+='<div class="two"><div class="f"><label>Telefon</label><input type="tel" id="f-tel" value="'+esc(g('tel','telefon'))+'"></div>'
@@ -1311,8 +1325,8 @@ function sheetTrash(){
   var b='<div class="hint">Gelöschte Einträge bleiben hier vollständig erhalten. '
     +'Nichts verschwindet von selbst – nur du entfernst hier endgültig.</div>';
   b+= t.length ? t.map(function(e){
-      return '<div class="lrow"><div><div class="lrow-t">'+esc(e.client||e.was||areaName(e.area))+'</div>'
-        +'<div class="lrow-s">'+dLang(e.date)+' · '+areaName(e.area)+' · '+eur(amountOf(e))+'</div></div>'
+      return '<div class="lrow"><div><div class="lrow-t">'+esc(e.client||e.bez||e.was||areaKurz(e.area))+'</div>'
+        +'<div class="lrow-s">'+dLang(e.date)+' · '+areaKurz(e.area)+' · '+eur(amountOf(e))+'</div></div>'
         +'<div class="lrow-a"><button class="btn btn-line btn-sm" onclick="A.restoreEntry(\''+e.id+'\')">Zurück</button>'
         +'<button class="btn btn-line btn-sm" style="color:var(--red)" onclick="A.purgeEntry(\''+e.id+'\')">Endgültig</button></div></div>';
     }).join('') : '<div class="empty">Der Papierkorb ist leer.</div>';
@@ -1438,11 +1452,11 @@ function reportBlock(area,list,titel){
     : [['Aufträge',String(s.nRel),s.storno?s.storno+' storniert (zählen nicht)':titel],
        ['Honorar',eur(s.betrag),'ohne Stornos'],
        ['Anzahlungen',eur(s.anzahlung),'bereits erhalten'],
+       ['Bereits bezahlt',eur(s.betrag-s.offen),'eingegangen'],
        ['Noch offen',eur(s.offen),s.offen?'ausstehend':'alles bezahlt'],
-       ['Ausgaben',eur(s.ausgaben),'erfasste Auslagen'],
-       ['Ergebnis',eur(s.ergebnis),'Honorar minus Ausgaben']];
+       ['Ø je Auftrag',eur(s.nRel?s.betrag/s.nRel:0),'Durchschnitt']];
 
-  var h='<div class="rep-sec"><h2>'+esc(areaName(area))+' · Kennzahlen</h2><div class="rep-tiles">'
+  var h='<div class="rep-sec"><h2>'+esc(areaLang(area))+' · Kennzahlen</h2><div class="rep-tiles">'
     +kacheln.map(function(k){return repTile(k[0],k[1],k[2]);}).join('')+'</div></div>';
 
   if(area==='martin'){
@@ -1522,7 +1536,7 @@ function reportBlock(area,list,titel){
     h+='<table class="rep-table"><thead><tr>'
       +'<th>Datum</th><th>Kunde</th><th>Auftragsart</th><th>Ort</th><th>Was</th>'
       +'<th class="rep-r">Zeit</th><th>Abrechnung</th><th class="rep-r">Honorar</th>'
-      +'<th class="rep-r">Anzahlung</th><th class="rep-r">Ausgaben</th><th class="rep-r">Offen</th>'
+      +'<th class="rep-r">Anzahlung</th><th class="rep-r">Offen</th>'
       +'<th>Status</th><th>Fotoübergabe</th><th>Rechnungsnr</th><th>Kommentar</th></tr></thead><tbody>'
       +list.map(function(e){
         var st=e.status==='Storniert';
@@ -1532,14 +1546,13 @@ function reportBlock(area,list,titel){
           +'<td>'+(e.billing==='hourly'?eur(rateOf(e))+'/Std':'Festbetrag')+'</td>'
           +'<td class="rep-r">'+eur(amountOf(e))+'</td>'
           +'<td class="rep-r">'+(anzOf(e)?eur(anzOf(e)):'')+'</td>'
-          +'<td class="rep-r">'+(ausgOf(e)?eur(ausgOf(e)):'')+'</td>'
           +'<td class="rep-r">'+(offenOf(e)?eur(offenOf(e)):'—')+'</td>'
           +'<td>'+esc(e.status)+'</td><td>'+esc(e.uebergabe||'')+'</td><td>'+esc(e.rechnung||'')+'</td>'
           +'<td>'+esc(e.notiz||'')+'</td></tr>';
       }).join('')
       +'</tbody><tfoot><tr><td colspan="7">SUMME (ohne Stornos)</td>'
       +'<td class="rep-r">'+eur(s.betrag)+'</td><td class="rep-r">'+eur(s.anzahlung)+'</td>'
-      +'<td class="rep-r">'+eur(s.ausgaben)+'</td><td class="rep-r">'+eur(s.offen)+'</td>'
+      +'<td class="rep-r">'+eur(s.offen)+'</td>'
       +'<td colspan="4"></td></tr></tfoot></table>';
   }
   h+='</div>';
@@ -1613,7 +1626,7 @@ function showReport(){
 
   var h='<div class="rep-head"><div><h1>Auftragsbuch</h1>'
     +'<div class="rep-sub">'+esc(kurz)+' · '+esc(titel)+' · '
-    +esc(ui.repBereich==='beide'?'Alle Bereiche':areaName(ui.repBereich))+'</div></div>'
+    +esc(ui.repBereich==='beide'?'Alle Bereiche':areaLang(ui.repBereich))+'</div></div>'
     +'<div class="rep-meta">Erstellt am '+esc(stamp())+'<br>'+g.n+' Zeilen · '+eur(g.betrag)+'<br>Sicherungsdokument</div></div>';
 
   h+='<div class="rep-sec"><h2>'+esc(vTitel)+'</h2>'

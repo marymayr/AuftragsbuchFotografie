@@ -1,14 +1,19 @@
 # Auftragsbuch · Aufträge, Arbeitszeit & Ausgaben
 
-Drei Bücher in einer App, alle nach **Monaten und Jahren** gegliedert:
+Drei Bücher in einer App, alle nach **Monaten und Jahren** gegliedert und auf
+der Startseite in zwei Gruppen sortiert:
 
-- **Selbstständigkeit** – eigene Aufträge mit Kunde, Auftragsart, Ort, Kontakt,
-  Honorar, Anzahlung, Ausgaben, Rechnungsnummer, Auftragsstatus und der
-  Übermittlung der Fotos.
-- **Anstellung – Martin Slováček** – Arbeitszeiten mit Stundensatz, Fahrzeit
-  und Fahrtgeld.
-- **Betriebsausgaben** – Anschaffungen und Kosten der Selbstständigkeit, von der
-  Gewerbeanmeldung bis zum Objektiv.
+**Selbstständigkeit**
+- **Einnahmen** – eigene Aufträge mit Kunde, Auftragsart, Ort, Kontakt, Honorar,
+  Anzahlung, Rechnungsnummer, Auftragsstatus und der Übermittlung der Fotos.
+- **Betriebsausgaben** – Anschaffungen und Kosten, von der Gewerbeanmeldung bis
+  zum Objektiv.
+
+**Anstellung**
+- **Martin Slováček** – Arbeitszeiten mit Stundensatz, Fahrzeit und Fahrtgeld.
+
+Auf breiten Bildschirmen steht die Selbstständigkeit links und die Anstellung
+rechts; auf dem Handy stapeln sich die Gruppen untereinander.
 
 Läuft vollständig im Browser: kein Server, kein Konto, keine Cloud. Alle Daten
 liegen verschlüsselt auf dem Gerät. Monats-, Jahres- und Gesamtberichte lassen
@@ -97,7 +102,7 @@ Filter nach Auftragsart und Status dazu.
 
 ---
 
-## 4. Aufträge erfassen
+## 4. Einnahmen erfassen
 
 **+ Auftrag** unten.
 
@@ -109,7 +114,6 @@ Filter nach Auftragsart und Status dazu.
 | Datum, Zeit | Zeit nur nötig, wenn nach Stundensatz abgerechnet wird |
 | Abrechnung | **Festbetrag** oder **Stundensatz** |
 | Anzahlung | Bereits erhaltener Teilbetrag |
-| Ausgaben | Auslagen für diesen Auftrag |
 | Übermittlung der Fotos | noch nicht übergeben · Dropbox · USB-Stick · Sonstiges |
 | Ort, Telefon, E-Mail, Rechnungsnr., Fotos, Notiz | Freitext |
 
@@ -122,7 +126,8 @@ Fotos noch rausmüssen.
   Offen, nicht in den Diagrammen. Sie bleiben sichtbar und durchgestrichen.
 - Offen = Honorar − Anzahlung. Ist die Anzahlung so hoch wie das Honorar, gilt
   der Auftrag als bezahlt.
-- Ergebnis = Honorar − Ausgaben.
+- Ausgaben werden **nicht** mehr je Auftrag erfasst – dafür gibt es den eigenen
+  Bereich *Betriebsausgaben*.
 
 ---
 

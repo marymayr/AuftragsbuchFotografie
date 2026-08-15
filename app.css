@@ -49,6 +49,17 @@ h1,h2,h3,p{margin:0;}
 .mark-rule{height:1px;background:var(--line);margin:14px 0 0;}
 .mark-sub{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);margin-top:12px;}
 
+/* ---------- Gruppen auf der Startseite ---------- */
+.wrap-home{max-width:900px;}
+.gruppen{display:grid;gap:4px;}
+.gruppe-t{font-size:10.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ink-3);margin:22px 0 -4px 4px;}
+/* Auf breiten Bildschirmen Selbstständigkeit links, Anstellung rechts. */
+@media (min-width:780px){
+  .gruppen{grid-template-columns:1fr 1fr;gap:26px;align-items:start;}
+  .gruppe-t{margin-top:6px;}
+}
+
 /* ---------- bereichskarten ---------- */
 .area-card{
   display:block;width:100%;text-align:left;background:var(--surface);
