@@ -1,288 +1,40 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Auftragsbuch Fotografie</title>
-<meta name="description" content="Passwortgeschütztes Auftragsbuch für Fotografie – mit monatlichen PDF-Backups.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Ccircle cx='16' cy='17' r='6.5' fill='none' stroke='white' stroke-width='2.4'/%3E%3Cpath d='M9 9h5l1.2-2h1.6L18 9h5' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Auftragsbuch</title>
+<meta name="description" content="Arbeitszeit und Honorar erfassen – passwortgeschützt, mit PDF-Berichten.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Auftragsbuch">
+<meta name="theme-color" content="#F2EFE9">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
 
-<!-- ══════════════ Sperrbildschirm / Ersteinrichtung ══════════════ -->
-<div id="gate" class="gate" hidden>
-  <div class="gate-card">
-    <div class="gate-logo" aria-hidden="true">
-      <svg viewBox="0 0 32 32" width="40" height="40"><rect width="32" height="32" rx="7" fill="#2a78d6"/><circle cx="16" cy="17" r="6.5" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M9 9h5l1.2-2h1.6L18 9h5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-    </div>
-    <h1>Auftragsbuch Fotografie</h1>
+<div id="app"></div>
 
-    <!-- Ersteinrichtung -->
-    <form id="form-setup" class="gate-form" hidden autocomplete="off">
-      <p class="gate-lead">Willkommen! Vergib ein Passwort. Alle Daten werden damit
-        auf diesem Gerät <strong>verschlüsselt</strong> gespeichert.</p>
-      <label for="setup-pw1">Passwort (mind. 8 Zeichen)</label>
-      <input id="setup-pw1" type="password" minlength="8" required autocomplete="new-password">
-      <label for="setup-pw2">Passwort wiederholen</label>
-      <input id="setup-pw2" type="password" minlength="8" required autocomplete="new-password">
-      <label for="setup-hint">Erinnerungshilfe (optional, wird unverschlüsselt gespeichert)</label>
-      <input id="setup-hint" type="text" maxlength="80" autocomplete="off">
-      <p class="warn-box">
-        <strong>Wichtig:</strong> Ohne dieses Passwort können die Daten nicht mehr
-        gelesen werden – es gibt keine Wiederherstellung. Notiere es an einem sicheren Ort.
-      </p>
-      <button class="btn btn-primary btn-block" type="submit">Auftragsbuch anlegen</button>
-      <p class="gate-msg" id="setup-msg" role="alert"></p>
-    </form>
+<!-- Sicherung aus einer Datei einspielen -->
+<input type="file" id="fileimp" accept="application/json,.json" hidden onchange="A.importDatei(this)">
 
-    <!-- Entsperren -->
-    <form id="form-unlock" class="gate-form" hidden autocomplete="off">
-      <p class="gate-lead">Bitte Passwort eingeben, um das Auftragsbuch zu öffnen.</p>
-      <label for="unlock-pw">Passwort</label>
-      <input id="unlock-pw" type="password" required autocomplete="current-password">
-      <p class="gate-hint" id="unlock-hint" hidden></p>
-      <button class="btn btn-primary btn-block" type="submit">Entsperren</button>
-      <p class="gate-msg" id="unlock-msg" role="alert"></p>
-    </form>
-
-    <p id="gate-error" class="warn-box" hidden></p>
-  </div>
-  <p class="gate-foot">Die Daten verlassen dieses Gerät nicht. Sie liegen verschlüsselt im Browser-Speicher.</p>
-</div>
-
-<!-- ══════════════ Anwendung ══════════════ -->
-<div id="app" class="app" hidden>
-
-  <header class="topbar">
-    <div class="brand">
-      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#2a78d6"/><circle cx="16" cy="17" r="6.5" fill="none" stroke="#fff" stroke-width="2.4"/><path d="M9 9h5l1.2-2h1.6L18 9h5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      <span>Auftragsbuch <em>Fotografie</em></span>
-    </div>
-    <div class="topbar-actions">
-      <button class="btn btn-primary" id="btn-new">+ Neuer Auftrag</button>
-      <button class="btn" id="btn-lock" title="Auftragsbuch sperren">Sperren</button>
-    </div>
-  </header>
-
-  <nav class="tabs" role="tablist">
-    <button class="tab is-active" role="tab" data-view="uebersicht">Übersicht</button>
-    <button class="tab" role="tab" data-view="auftraege">Aufträge</button>
-    <button class="tab" role="tab" data-view="auswertung">Auswertung</button>
-    <button class="tab" role="tab" data-view="backup">Backup &amp; Verwaltung</button>
-  </nav>
-
-  <main class="main">
-
-    <!-- ─────────── Übersicht ─────────── -->
-    <section class="view is-active" id="view-uebersicht">
-      <div id="backup-reminder"></div>
-
-      <h2 class="h2">Dieser Monat <span class="h2-sub" id="ov-monthname"></span></h2>
-      <div class="tiles" id="ov-tiles-month"></div>
-
-      <h2 class="h2">Laufendes Jahr <span class="h2-sub" id="ov-yearname"></span></h2>
-      <div class="tiles" id="ov-tiles-year"></div>
-
-      <div class="grid-2">
-        <div class="card">
-          <h3 class="h3">Umsatz pro Monat <span class="h3-sub" id="ov-chart-year"></span></h3>
-          <div id="ov-chart"></div>
-        </div>
-        <div class="card">
-          <h3 class="h3">Nächste Termine</h3>
-          <div id="ov-upcoming"></div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h3 class="h3">Offene Zahlungen</h3>
-        <div id="ov-open"></div>
-      </div>
-    </section>
-
-    <!-- ─────────── Aufträge ─────────── -->
-    <section class="view" id="view-auftraege">
-      <div class="filters">
-        <div class="f">
-          <label for="f-suche">Suche</label>
-          <input id="f-suche" type="search" placeholder="Kunde, Ort, Notiz, Rechnungsnr. …">
-        </div>
-        <div class="f"><label for="f-jahr">Jahr</label><select id="f-jahr"></select></div>
-        <div class="f"><label for="f-monat">Monat</label><select id="f-monat"></select></div>
-        <div class="f"><label for="f-art">Art</label><select id="f-art"></select></div>
-        <div class="f"><label for="f-status">Status</label><select id="f-status"></select></div>
-        <div class="f"><label for="f-zahlung">Zahlung</label><select id="f-zahlung"></select></div>
-        <div class="f f-reset"><button class="btn" id="f-clear">Filter zurücksetzen</button></div>
-      </div>
-      <div class="listmeta" id="list-meta"></div>
-      <div class="tablewrap"><table class="table" id="table-auftraege"></table></div>
-    </section>
-
-    <!-- ─────────── Auswertung ─────────── -->
-    <section class="view" id="view-auswertung">
-      <div class="filters">
-        <div class="f">
-          <label for="a-zeitraum">Zeitraum</label>
-          <select id="a-zeitraum"></select>
-        </div>
-      </div>
-      <div class="tiles" id="aw-tiles"></div>
-      <div class="card">
-        <h3 class="h3">Umsatz im Zeitverlauf <span class="h3-sub" id="aw-chart1-sub"></span></h3>
-        <div id="aw-chart1"></div>
-      </div>
-      <div class="grid-2">
-        <div class="card">
-          <h3 class="h3">Umsatz nach Auftragsart</h3>
-          <div id="aw-chart2"></div>
-        </div>
-        <div class="card">
-          <h3 class="h3">Aufträge nach Status</h3>
-          <div id="aw-chart3"></div>
-        </div>
-      </div>
-    </section>
-
-    <!-- ─────────── Backup & Verwaltung ─────────── -->
-    <section class="view" id="view-backup">
-
-      <div class="card">
-        <h3 class="h3">PDF-Bericht erstellen</h3>
-        <p class="card-lead">Erzeugt einen gestalteten Bericht mit Kennzahlen, Diagrammen und
-          vollständiger Auftragstabelle. In der Vorschau auf <em>Drucken</em> klicken und im
-          Druckdialog <em>„Als PDF sichern“</em> wählen.</p>
-        <div class="row-controls">
-          <div class="f">
-            <label for="r-umfang">Umfang</label>
-            <select id="r-umfang">
-              <option value="monat">Einzelner Monat</option>
-              <option value="jahr">Ganzes Jahr</option>
-              <option value="alles">Alles (Gesamtarchiv)</option>
-            </select>
-          </div>
-          <div class="f"><label for="r-jahr">Jahr</label><select id="r-jahr"></select></div>
-          <div class="f"><label for="r-monat">Monat</label><select id="r-monat"></select></div>
-          <div class="f f-reset"><button class="btn btn-primary" id="btn-report">Bericht anzeigen</button></div>
-        </div>
-        <p class="hint">Tipp: Ein Monatsbericht am Monatsende – so wächst dein PDF-Archiv automatisch.</p>
-      </div>
-
-      <div class="card">
-        <h3 class="h3">Datensicherung (zum Wiederherstellen)</h3>
-        <p class="card-lead">Ein PDF ist zum Ansehen und Archivieren. Um die Daten notfalls
-          <em>zurückspielen</em> zu können, brauchst du zusätzlich eine Datendatei.</p>
-        <div class="btnrow">
-          <button class="btn btn-primary" id="btn-export-json">JSON-Backup herunterladen</button>
-          <button class="btn" id="btn-export-csv">CSV-Tabelle herunterladen</button>
-          <button class="btn" id="btn-import">Backup einspielen …</button>
-          <input type="file" id="file-import" accept="application/json,.json" hidden>
-        </div>
-        <p class="hint" id="backup-status"></p>
-      </div>
-
-      <div class="card">
-        <h3 class="h3">Papierkorb</h3>
-        <p class="card-lead">Gelöschte Aufträge landen hier und bleiben erhalten, bis du sie
-          hier einzeln endgültig entfernst. Nichts verschwindet von selbst.</p>
-        <div id="trash-list"></div>
-      </div>
-
-      <div class="card">
-        <h3 class="h3">Passwort ändern</h3>
-        <form id="form-pw" class="form-inline" autocomplete="off">
-          <div class="f"><label for="pw-old">Aktuelles Passwort</label><input id="pw-old" type="password" required autocomplete="current-password"></div>
-          <div class="f"><label for="pw-new1">Neues Passwort</label><input id="pw-new1" type="password" minlength="8" required autocomplete="new-password"></div>
-          <div class="f"><label for="pw-new2">Wiederholen</label><input id="pw-new2" type="password" minlength="8" required autocomplete="new-password"></div>
-          <div class="f f-reset"><button class="btn btn-primary" type="submit">Ändern</button></div>
-        </form>
-        <p class="hint" id="pw-msg"></p>
-      </div>
-
-      <div class="card card-danger">
-        <h3 class="h3">Alles löschen</h3>
-        <p class="card-lead">Löscht <strong>sämtliche</strong> Aufträge, Einstellungen und das
-          Passwort unwiderruflich von diesem Gerät. Das passiert nur hier – nie automatisch.</p>
-        <button class="btn btn-danger" id="btn-wipe">Alles löschen …</button>
-      </div>
-
-      <div class="card">
-        <h3 class="h3">Speicher-Info</h3>
-        <div id="storage-info"></div>
-      </div>
-    </section>
-
-  </main>
-</div>
-
-<!-- ══════════════ Auftrag anlegen / bearbeiten ══════════════ -->
-<dialog id="dlg-auftrag" class="dlg">
-  <form method="dialog" id="form-auftrag">
-    <header class="dlg-head">
-      <h2 id="dlg-title">Neuer Auftrag</h2>
-      <button class="btn-x" type="button" id="dlg-close" aria-label="Schließen">×</button>
-    </header>
-    <div class="dlg-body">
-      <div class="fieldgrid">
-        <div class="f span2"><label for="j-kunde">Kunde / Auftraggeber *</label><input id="j-kunde" required maxlength="120"></div>
-        <div class="f"><label for="j-datum">Datum *</label><input id="j-datum" type="date" required></div>
-        <div class="f"><label for="j-art">Auftragsart</label><select id="j-art"></select></div>
-        <div class="f"><label for="j-von">Von</label><input id="j-von" type="time"></div>
-        <div class="f"><label for="j-bis">Bis</label><input id="j-bis" type="time"></div>
-        <div class="f span2"><label for="j-ort">Ort</label><input id="j-ort" maxlength="140"></div>
-        <div class="f"><label for="j-telefon">Telefon</label><input id="j-telefon" type="tel" maxlength="60"></div>
-        <div class="f"><label for="j-email">E-Mail</label><input id="j-email" type="email" maxlength="120"></div>
-
-        <div class="f"><label for="j-honorar">Honorar (€)</label><input id="j-honorar" type="number" step="0.01" min="0" inputmode="decimal"></div>
-        <div class="f"><label for="j-anzahlung">Anzahlung (€)</label><input id="j-anzahlung" type="number" step="0.01" min="0" inputmode="decimal"></div>
-        <div class="f"><label for="j-ausgaben">Ausgaben (€)</label><input id="j-ausgaben" type="number" step="0.01" min="0" inputmode="decimal"></div>
-        <div class="f"><label for="j-zahlung">Zahlungsstatus</label><select id="j-zahlung"></select></div>
-        <div class="f"><label for="j-status">Auftragsstatus</label><select id="j-status"></select></div>
-        <div class="f"><label for="j-rechnung">Rechnungsnr.</label><input id="j-rechnung" maxlength="40"></div>
-        <div class="f span2"><label for="j-notizen">Notizen</label><textarea id="j-notizen" rows="3" maxlength="2000"></textarea></div>
-      </div>
-      <p class="dlg-meta" id="dlg-meta"></p>
-    </div>
-    <footer class="dlg-foot">
-      <button class="btn btn-quiet" type="button" id="j-delete" hidden>In den Papierkorb</button>
-      <span class="spacer"></span>
-      <button class="btn" type="button" id="j-cancel">Abbrechen</button>
-      <button class="btn btn-primary" type="submit">Speichern</button>
-    </footer>
-  </form>
-</dialog>
-
-<!-- ══════════════ Alles löschen ══════════════ -->
-<dialog id="dlg-wipe" class="dlg dlg-narrow">
-  <form method="dialog">
-    <header class="dlg-head"><h2>Wirklich alles löschen?</h2></header>
-    <div class="dlg-body">
-      <p class="warn-box">Alle Aufträge, der Papierkorb und das Passwort werden von diesem
-        Gerät entfernt. <strong>Das lässt sich nicht rückgängig machen.</strong> Ohne ein
-        vorher heruntergeladenes JSON-Backup sind die Daten dann weg.</p>
-      <p id="wipe-count" class="dlg-meta"></p>
-      <label class="check"><input type="checkbox" id="wipe-ack"> Ich habe ein aktuelles Backup gespeichert (oder brauche keines).</label>
-      <label for="wipe-word">Zum Bestätigen bitte <code>ALLES LÖSCHEN</code> eintippen:</label>
-      <input id="wipe-word" autocomplete="off" spellcheck="false">
-    </div>
-    <footer class="dlg-foot">
-      <span class="spacer"></span>
-      <button class="btn" type="button" id="wipe-cancel">Abbrechen</button>
-      <button class="btn btn-danger" type="button" id="wipe-go" disabled>Endgültig löschen</button>
-    </footer>
-  </form>
-</dialog>
-
-<!-- ══════════════ Berichts-Vorschau (Druck / PDF) ══════════════ -->
-<div id="report-bar" class="report-bar" hidden>
-  <button class="btn" id="report-back">← Zurück</button>
-  <span class="report-bar-title" id="report-bar-title"></span>
-  <button class="btn btn-primary" id="report-print">Drucken / als PDF sichern</button>
+<!-- Berichts-Vorschau: am Bildschirm sichtbar, beim Drucken die einzige Seite -->
+<div id="reportbar" class="reportbar" hidden>
+  <button class="btn btn-line btn-sm" id="reportback">← Zurück</button>
+  <span class="reportbar-t" id="reportbar-t"></span>
+  <button class="btn btn-fill btn-sm" style="flex:none" id="reportprint">Drucken / als PDF sichern</button>
 </div>
 <div id="report" class="report" hidden></div>
 
-<div id="toast" class="toast" hidden></div>
-
 <script src="app.js"></script>
+<script>
+if('serviceWorker' in navigator){
+  window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});
+}
+</script>
 </body>
 </html>

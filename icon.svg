@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Auftragsbuch">
+  <rect width="512" height="512" rx="112" fill="#3F5D52"/>
+  <g fill="none" stroke="#F2EFE9" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M104 200a30 30 0 0130-30h56l32-46a26 26 0 0121-11h126a26 26 0 0121 11l32 46h56a30 30 0 0130 30v152a30 30 0 01-30 30H134a30 30 0 01-30-30z"
+          transform="translate(-24 -8) scale(0.92) translate(24 8)"/>
+    <circle cx="256" cy="286" r="76"/>
+    <circle cx="256" cy="286" r="28"/>
+  </g>
+</svg>
