@@ -34,6 +34,18 @@ var STATUS=['Anfrage','Bestätigt','Durchgeführt','Abgeschlossen','Storniert'];
 var STATUS_DOT={'Anfrage':'dot-muted','Bestätigt':'dot-accent','Durchgeführt':'dot-gold',
                 'Abgeschlossen':'dot-good','Storniert':'dot-red'};
 
+/* Wie die Fotos zum Kunden gekommen sind */
+var UEBERGABE=['noch nicht übergeben','Dropbox','USB-Stick','Sonstiges'];
+var UEBERGABE_DOT={'noch nicht übergeben':'dot-red','Dropbox':'dot-good','USB-Stick':'dot-good','Sonstiges':'dot-gold'};
+
+/* Betriebsausgaben der Selbstständigkeit */
+var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Speicher & Festplatten',
+                'Stativ & Zubehör','Akkus & Strom','Software & Abos','Versicherung',
+                'Weiterbildung','Werbung & Web','Büro & Porto','Fahrtkosten','Sonstiges'];
+var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
+
+var IMPORT_DATEI='daten/martin-arbeitszeit.json';
+
 var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
 
 var ui={
@@ -119,7 +131,7 @@ function save(){ return persist().catch(function(){ ui.saveErr=true; render(); }
 function normEntry(o){
   var e={
     id:o.id||uid(),
-    area:o.area==='self'?'self':'martin',
+    area:(o.area==='self'||o.area==='ausgaben')?o.area:'martin',
     date:o.date||today(),
     timeMode:o.timeMode==='range'?'range':'duration',
     start:o.start||'', end:o.end||'',
@@ -135,6 +147,14 @@ function normEntry(o){
     e.modus=(o.modus==='fahrzeit'||o.modus==='kilometer')?o.modus:'regulaer';
     e.km=Number(o.km)||0; e.name=o.name||'';
     if(o.fotos) e.fotos=Number(o.fotos)||0;
+  }else if(e.area==='ausgaben'){
+    e.bez=o.bez||o.was||'';
+    e.kat=KATEGORIEN.indexOf(o.kat)>=0?o.kat:'Sonstiges';
+    e.betrag=Number(o.betrag)||0;
+    e.haendler=o.haendler||'';
+    e.zahlart=ZAHLARTEN.indexOf(o.zahlart)>=0?o.zahlart:'Bankkarte';
+    e.beleg=!!o.beleg;
+    e.timeMode='duration'; e.durH=0; e.durM=0; e.paid=false; e.payment=null;
   }else{
     e.client=o.client||'';
     e.art=ARTEN.indexOf(o.art)>=0?o.art:'Sonstiges';
@@ -144,6 +164,7 @@ function normEntry(o){
     e.amount=Number(o.amount)||0; e.rate=Number(o.rate)||0;
     e.anzahlung=Number(o.anzahlung)||0; e.ausgaben=Number(o.ausgaben)||0;
     e.rechnung=o.rechnung||'';
+    e.uebergabe=UEBERGABE.indexOf(o.uebergabe)>=0?o.uebergabe:UEBERGABE[0];
     if(o.fotos) e.fotos=Number(o.fotos)||0;
   }
   return e;
@@ -218,6 +239,7 @@ function rateOf(e){
 /** Stornierte Aufträge zählen nirgends mit. */
 function zaehlt(e){ return !(e.area==='self' && e.status==='Storniert'); }
 function amountOf(e){
+  if(e.area==='ausgaben') return Number(e.betrag)||0;
   if(e.area==='self') return e.billing==='fix' ? (Number(e.amount)||0) : paidHours(e)*rateOf(e);
   if(e.modus==='kilometer') return Math.max(0,(Number(e.km)||0)-(settings.kmFrei||0))*(settings.kmRate||0);
   return paidHours(e)*rateOf(e);
@@ -225,9 +247,10 @@ function amountOf(e){
 function anzOf(e){ return e.area==='self' ? Math.min(Number(e.anzahlung)||0, amountOf(e)) : 0; }
 function ausgOf(e){ return e.area==='self' ? (Number(e.ausgaben)||0) : 0; }
 function offenOf(e){
-  if(!zaehlt(e)||e.paid) return 0;
+  if(e.area==='ausgaben'||!zaehlt(e)||e.paid) return 0;
   return Math.max(0, amountOf(e)-anzOf(e));
 }
+function mitBeleg(e){ return e.area==='ausgaben' && e.beleg; }
 function kmOf(e){return e.modus==='kilometer'?(Number(e.km)||0):0;}
 function fotosPerH(e){var h=paidHours(e);return (e.fotos&&h)?(Number(e.fotos)/h):null;}
 function modusLabel(e){return e.modus==='fahrzeit'?'Fahrzeit':e.modus==='kilometer'?'Kilometer':'regulär';}
@@ -244,7 +267,9 @@ function summe(l){
     n:l.length, nRel:rel.length, storno:l.length-rel.length,
     zeit:add(rel.map(rawHours)), bez:add(rel.map(paidHours)), km:add(rel.map(kmOf)),
     betrag:betrag, anzahlung:add(rel.map(anzOf)), ausgaben:ausgaben,
-    offen:add(rel.map(offenOf)), ergebnis:betrag-ausgaben
+    offen:add(rel.map(offenOf)), ergebnis:betrag-ausgaben,
+    belegt:add(rel.map(function(e){return mitBeleg(e)?amountOf(e):0;})),
+    ohneBeleg:add(rel.map(function(e){return e.area==='ausgaben'&&!e.beleg?amountOf(e):0;}))
   };
 }
 
@@ -263,18 +288,31 @@ function jahre(a){
   return Object.keys(s).sort().reverse();
 }
 function payFor(a,m){return payments.filter(function(p){return p.area===a&&p.month===m;});}
-function areaName(a){return a==='martin'?'Martin':'Aufträge';}
-function areaKind(a){return a==='martin'?'Arbeitszeit · unselbständig':'Eigene Aufträge & Honorare';}
+var BEREICHE=['self','martin','ausgaben'];
+function areaName(a){
+  return a==='martin' ? 'Anstellung – Martin Slovaczek'
+       : a==='ausgaben' ? 'Betriebsausgaben' : 'Selbstständigkeit';
+}
+function areaKurz(a){ return a==='martin'?'Anstellung':a==='ausgaben'?'Betriebsausgaben':'Selbstständigkeit'; }
+function areaKind(a){
+  return a==='martin' ? 'Arbeitszeiten & Einnahmen'
+       : a==='ausgaben' ? 'Ausgaben für die Selbstständigkeit' : 'Einnahmen & Ausgaben';
+}
+function areaFarbe(a){ return a==='martin'?'var(--martin)':a==='ausgaben'?'var(--gold)':'var(--self)'; }
+/* Für Berichte, die außerhalb der Bereichsansicht gezeichnet werden. */
+function areaHex(a){ return a==='martin'?'#3F5D52':a==='ausgaben'?'#8A6E42':'#8C5F3F'; }
+/* Betriebsausgaben werden nicht abgerechnet – dort gibt es kein Häkchen. */
+function hatAbrechnung(a){ return a!=='ausgaben'; }
 
 function sucheAktiv(){ return !!(ui.suche.trim()||ui.fArt||ui.fStatus); }
 function treffer(a){
   var q=ui.suche.trim().toLowerCase();
   return sortEntries(areaEntries(a).filter(function(e){
-    if(ui.fArt && e.art!==ui.fArt) return false;
+    if(ui.fArt && (e.area==='ausgaben' ? e.kat!==ui.fArt : e.art!==ui.fArt)) return false;
     if(ui.fStatus && e.status!==ui.fStatus) return false;
     if(q){
-      var hay=[e.client,e.name,e.was,e.ort,e.notiz,e.rechnung,e.telefon,e.email,e.art,e.status]
-        .filter(Boolean).join(' ').toLowerCase();
+      var hay=[e.client,e.name,e.was,e.ort,e.notiz,e.rechnung,e.telefon,e.email,e.art,e.status,
+               e.bez,e.kat,e.haendler,e.zahlart,e.uebergabe].filter(Boolean).join(' ').toLowerCase();
       if(hay.indexOf(q)<0) return false;
     }
     return true;
@@ -380,7 +418,7 @@ function onSuche(el){
   if(box) box.innerHTML=ledgerHTML();
 }
 function onFilter(){
-  ui.fArt=v('fq-art'); ui.fStatus=v('fq-status');
+  ui.fArt=v('fq-art'); ui.fStatus=document.getElementById('fq-status')?v('fq-status'):'';
   var box=document.getElementById('ledgerbox');
   if(box) box.innerHTML=ledgerHTML();
 }
@@ -407,10 +445,21 @@ function openForm(id){
 }
 function keepDraft(){
   ['f-date','f-start','f-end','f-dh','f-dm','f-km','f-was','f-name','f-fotos','f-notiz',
-   'f-client','f-amount','f-rate','f-ort','f-tel','f-mail','f-anz','f-ausg','f-rech','f-status','f-kunstart']
+   'f-client','f-amount','f-rate','f-ort','f-tel','f-mail','f-anz','f-ausg','f-rech','f-status','f-kunstart',
+   'f-ueber','f-bez','f-kat','f-betrag','f-haendler','f-zahlart']
     .forEach(function(id){var el=document.getElementById(id);if(el)ui.draft[id.slice(2)]=el.value;});
 }
-function setArea(x){keepDraft();ui.fArea=x;ui.fTime=x==='self'?'duration':ui.fTime;render();}
+function setArea(x){
+  keepDraft(); ui.fArea=x;
+  if(x==='self') ui.fTime='duration';
+  render();
+}
+function toggleBeleg(el){
+  var box=document.getElementById('f-beleg');
+  if(!box) return;
+  if(!el) box.checked=!box.checked;
+  ui.draft.beleg=box.checked?'1':'0';
+}
 function setArt(x){keepDraft();ui.fArt2=x;render();}
 function setModus2(x){keepDraft();ui.fModus=x;render();}
 function setTimeMode(x){keepDraft();ui.fTime=x;render();}
@@ -439,12 +488,23 @@ function saveForm(){
       if(!hatZeit) errs.time=ui.fTime==='range'?'Beginn und Ende angeben':'Dauer fehlt';
       if(v('f-fotos')) e.fotos=num(v('f-fotos'));
     }
+  }else if(ui.fArea==='ausgaben'){
+    e.bez=v('f-bez').trim();
+    e.kat=v('f-kat')||'Sonstiges';
+    e.betrag=num(v('f-betrag'));
+    e.haendler=v('f-haendler').trim();
+    e.zahlart=v('f-zahlart')||'Bankkarte';
+    e.beleg=!!(document.getElementById('f-beleg')&&document.getElementById('f-beleg').checked);
+    e.timeMode='duration'; e.durH=0; e.durM=0;
+    if(!e.bez) errs.bez='Bezeichnung fehlt';
+    if(!e.betrag) errs.betrag='Betrag fehlt';
   }else{
     e.client=v('f-client').trim();
     e.art=v('f-kunstart')||'Sonstiges';
     e.status=v('f-status')||'Bestätigt';
     e.ort=v('f-ort').trim(); e.telefon=v('f-tel').trim(); e.email=v('f-mail').trim();
     e.was=v('f-was').trim(); e.rechnung=v('f-rech').trim();
+    e.uebergabe=v('f-ueber')||UEBERGABE[0];
     e.anzahlung=num(v('f-anz')); e.ausgaben=num(v('f-ausg'));
     e.billing=ui.fBilling;
     if(!e.client) errs.client='Kunde fehlt';
@@ -581,18 +641,25 @@ function copyBackup(){
   }catch(x){}
 }
 function exportCSV(){
-  var head=['Bereich','Datum','Kunde / Name','Auftragsart','Ort','Was','Fahrzeit / regulär',
-            'Beginn','Ende','Zeit','gefahrene KM','bezahlte Zeit','Satz','Honorar',
-            'Anzahlung','Ausgaben','Offen','Auftragsstatus','Zahlung','Rechnungsnr','Kommentar'];
+  var head=['Bereich','Datum','Kunde / Name','Art / Kategorie','Ort / Händler','Was','Fahrzeit / regulär',
+            'Beginn','Ende','Zeit','gefahrene KM','bezahlte Zeit','Satz','Betrag',
+            'Anzahlung','Ausgaben','Offen','Status','Zahlung','Fotoübergabe','Rechnungsnr',
+            'Beleg','Kommentar'];
   var q=function(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';};
   var rows=sortEntries(alive()).map(function(e){
-    var self=e.area==='self';
-    return [self?'Aufträge':'Martin', dLang(e.date), self?e.client:(e.name||''),
-      self?e.art:artLabel(e), self?e.ort:'', e.was||'', self?'':modusLabel(e),
-      e.start||'', e.end||'', hm(rawHours(e)), kmOf(e)||'', dec2(paidHours(e)),
+    var self=e.area==='self', aus=e.area==='ausgaben';
+    return [areaKurz(e.area), dLang(e.date),
+      self?e.client:aus?'':(e.name||''),
+      self?e.art:aus?e.kat:artLabel(e),
+      self?e.ort:aus?(e.haendler||''):'',
+      aus?(e.bez||''):(e.was||''),
+      (self||aus)?'':modusLabel(e),
+      e.start||'', e.end||'', aus?'':hm(rawHours(e)), kmOf(e)||'', aus?'':dec2(paidHours(e)),
       rateOf(e)?dec2(rateOf(e)):'', dec2(amountOf(e)), self?dec2(anzOf(e)):'',
-      self?dec2(ausgOf(e)):'', dec2(offenOf(e)), self?e.status:'', zahlStatus(e),
-      self?(e.rechnung||''):'', (e.notiz||'').replace(/\s*\n\s*/g,' ')].map(q).join(';');
+      self?dec2(ausgOf(e)):'', aus?'':dec2(offenOf(e)), self?e.status:'',
+      aus?(e.zahlart||''):zahlStatus(e), self?(e.uebergabe||''):'',
+      self?(e.rechnung||''):'', aus?(e.beleg?'ja':'nein'):'',
+      (e.notiz||'').replace(/\s*\n\s*/g,' ')].map(q).join(';');
   });
   download('Auftragsbuch-'+today()+'.csv','﻿'+[head.join(';')].concat(rows).join('\r\n'),'text/csv;charset=utf-8');
 }
@@ -629,6 +696,24 @@ function applyRestore(){
   if(!mergeDaten(d,'der Zwischenablage')) return;
   ui.sheet=null; render(); save();
 }
+/* Die aus Martin_Arbeitszeit.xlsx erzeugte Sicherung liegt neben der App. */
+function importExcel(){
+  var btn=document.getElementById('xlbtn');
+  if(btn){ btn.textContent='Wird geladen …'; btn.disabled=true; }
+  fetch(IMPORT_DATEI,{cache:'no-store'})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(d){
+      if(mergeDaten(d,'der Excel-Liste „Martin Arbeitszeit“')){ ui.sheet=null; render(); save(); }
+      else render();
+    })
+    .catch(function(x){
+      render();
+      alert('Die Excel-Daten konnten nicht geladen werden (' + x.message + ').\n\n'
+        +'Das funktioniert nur, wenn du die Seite über eine Web-Adresse geöffnet hast '
+        +'(z. B. über GitHub Pages), nicht als lokale Datei.');
+    });
+}
+
 function importDatei(input){
   var f=input.files&&input.files[0]; input.value='';
   if(!f)return;
@@ -666,6 +751,13 @@ function liveCalc(){
          anzahlung:num(v('f-anz')),ausgaben:num(v('f-ausg')),status:v('f-status'),
          fotos:num(v('f-fotos'))};
   var parts=[];
+  if(ui.fArea==='ausgaben'){
+    var b=num(v('f-betrag'));
+    var jahr=(v('f-date')||today()).slice(0,4);
+    var bisher=add(yearEntries('ausgaben',jahr).filter(function(x){return x.id!==ui.editId;}).map(amountOf));
+    el.innerHTML='<b>'+eur(b)+'</b> &middot; Betriebsausgaben '+jahr+' danach '+eur(bisher+b);
+    return;
+  }
   if(ui.fArea==='martin'&&ui.fModus==='kilometer'){
     var frei=settings.kmFrei||0;
     parts.push('<b>'+eur(amountOf(e))+'</b>');
@@ -717,9 +809,9 @@ function banners(){
 function viewHome(){
   var h='<div class="wrap"><div class="masthead">'
     +'<div class="mark">'+cameraSVG()+'<span class="mark-title">Auftragsbuch</span></div>'
-    +'<div class="mark-rule"></div><div class="mark-sub">Aufträge &amp; Arbeitszeit</div></div>';
+    +'<div class="mark-rule"></div><div class="mark-sub">Aufträge · Arbeitszeit · Ausgaben</div></div>';
   h+=banners();
-  h+=['self','martin'].map(homeCard).join('');
+  h+=BEREICHE.map(homeCard).join('');
   h+=noteStream();
   h+='<div class="homelinks">'
     +'<button class="linkbtn" onclick="A.openReport()">Bericht &amp; PDF</button>'
@@ -730,22 +822,26 @@ function viewHome(){
   return h;
 }
 function homeCard(a){
+  /* Immer der laufende Monat und das laufende Jahr – richtet sich nach dem Datum des Geräts. */
   var m=curMk(), y=curY();
   var sM=summe(monthEntries(a,m)), sJ=summe(yearEntries(a,y));
-  var c=a==='martin'?'var(--martin)':'var(--self)';
   var zeile=function(k,s){
-    return '<div class="area-stats"><div class="area-per">'+esc(k)+'</div>'
-      + (a==='martin'
-        ? '<div><div class="stat-k">Stunden</div><div class="stat-v num">'+hm(s.bez)+'</div></div>'
-          +'<div><div class="stat-k">Betrag</div><div class="stat-v num">'+eur0(s.betrag)+'</div></div>'
-        : '<div><div class="stat-k">Aufträge</div><div class="stat-v num">'+s.nRel+'</div></div>'
-          +'<div><div class="stat-k">Honorar</div><div class="stat-v num">'+eur0(s.betrag)+'</div></div>')
-      +'<div><div class="stat-k">Offen</div><div class="stat-v num" style="color:'+(s.offen?'var(--red)':'var(--ink-3)')+'">'+eur0(s.offen)+'</div></div>'
-      +'</div>';
+    var mitte = a==='martin'
+      ? '<div><div class="stat-k">Stunden</div><div class="stat-v num">'+hm(s.bez)+'</div></div>'
+        +'<div><div class="stat-k">Betrag</div><div class="stat-v num">'+eur0(s.betrag)+'</div></div>'
+      : a==='ausgaben'
+      ? '<div><div class="stat-k">Posten</div><div class="stat-v num">'+s.n+'</div></div>'
+        +'<div><div class="stat-k">Ausgaben</div><div class="stat-v num">'+eur0(s.betrag)+'</div></div>'
+      : '<div><div class="stat-k">Aufträge</div><div class="stat-v num">'+s.nRel+'</div></div>'
+        +'<div><div class="stat-k">Honorar</div><div class="stat-v num">'+eur0(s.betrag)+'</div></div>';
+    var rechts = a==='ausgaben'
+      ? '<div><div class="stat-k">Ohne Beleg</div><div class="stat-v num" style="color:'+(s.ohneBeleg?'var(--red)':'var(--ink-3)')+'">'+eur0(s.ohneBeleg)+'</div></div>'
+      : '<div><div class="stat-k">Offen</div><div class="stat-v num" style="color:'+(s.offen?'var(--red)':'var(--ink-3)')+'">'+eur0(s.offen)+'</div></div>';
+    return '<div class="area-stats"><div class="area-per">'+esc(k)+'</div>'+mitte+rechts+'</div>';
   };
-  return '<button class="area-card" style="--c:'+c+'" onclick="A.go(\'area\',\''+a+'\')">'
+  return '<button class="area-card" style="--c:'+areaFarbe(a)+'" onclick="A.go(\'area\',\''+a+'\')">'
     +'<span class="chev">›</span>'
-    +'<div class="area-name">'+areaName(a)+'</div><div class="area-kind">'+areaKind(a)+'</div>'
+    +'<div class="area-name">'+esc(areaName(a))+'</div><div class="area-kind">'+esc(areaKind(a))+'</div>'
     +zeile(mMini(m)+' '+String(y).slice(2), sM)
     +zeile('Jahr '+y, sJ)
     +'</button>';
@@ -756,10 +852,9 @@ function noteStream(){
   if(!ns.length) return '';
   return '<div class="sec"><div class="sec-head"><span class="label">Notizen</span></div>'
     + ns.map(function(e){
-        var c=e.area==='martin'?'var(--martin)':'var(--self)';
         return '<div class="note" onclick="A.go(\'area\',\''+e.area+'\');A.setMonth(\''+mk(e.date)+'\')">'
-          +'<div class="note-top"><span class="note-src" style="color:'+c+'">'
-          +esc(e.area==='martin'?(e.name||'Martin'):(e.client||'Auftrag'))+'</span>'
+          +'<div class="note-top"><span class="note-src" style="color:'+areaFarbe(e.area)+'">'
+          +esc(e.area==='martin'?(e.name||'Anstellung'):e.area==='ausgaben'?(e.bez||'Ausgabe'):(e.client||'Auftrag'))+'</span>'
           +'<span class="note-date num">'+dShort(e.date)+'</span></div>'
           +'<div class="note-body">'+esc(e.notiz)+'</div></div>';
       }).join('') + '</div>';
@@ -775,7 +870,7 @@ function viewArea(){
 
   var h='<div class="topbar"><div class="topbar-inner"><div class="topbar-row">'
     +'<button class="back" onclick="A.go(\'home\')">‹</button>'
-    +'<span class="topbar-title">'+areaName(a)+'</span>'
+    +'<span class="topbar-title'+(a==='martin'?' lang':'')+'">'+esc(areaName(a))+'</span>'
     +'<button class="iconbtn'+(ui.sucheAn?' on':'')+'" title="Suchen" onclick="A.toggleSuche()">⌕</button>'
     +'<button class="iconbtn" title="Bericht" onclick="A.openReport()">▤</button>'
     +'<button class="iconbtn" title="Einstellungen" onclick="A.openSettings()">⚙</button></div>';
@@ -789,6 +884,10 @@ function viewArea(){
         +ARTEN.map(function(x){return '<option'+(ui.fArt===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select>'
         +'<select id="fq-status" onchange="A.onFilter()"><option value="">Alle Status</option>'
         +STATUS.map(function(x){return '<option'+(ui.fStatus===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>';
+    }else if(a==='ausgaben'){
+      h+='<div style="margin-top:8px">'
+        +'<select id="fq-art" onchange="A.onFilter()"><option value="">Alle Kategorien</option>'
+        +KATEGORIEN.map(function(x){return '<option'+(ui.fArt===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>';
     }
     h+='</div>';
   }
@@ -811,8 +910,12 @@ function viewArea(){
   h+='</div></div><div class="wrap">';
   h+=banners();
   h+='<div id="ledgerbox">'+ledgerHTML()+'</div>';
-  h+='</div><button class="fab" onclick="A.openForm()">+ '+(a==='self'?'Auftrag':'Eintrag')+'</button>';
+  h+='</div><button class="fab" onclick="A.openForm()">+ '
+    +(a==='self'?'Auftrag':a==='ausgaben'?'Ausgabe':'Eintrag')+'</button>';
   return h;
+}
+function wortFuer(a){
+  return a==='self'?['Auftrag','Aufträge']:a==='ausgaben'?['Posten','Posten']:['Eintrag','Einträge'];
 }
 
 /* Alles unterhalb der Kopfzeile – wird beim Tippen einzeln neu gezeichnet. */
@@ -837,10 +940,10 @@ function monatHTML(a){
     h+='<div class="ledger"><div class="empty">Keine Einträge in '+mLong(m)+'.</div></div>';
   }else{
     h+='<div class="ledger"><div class="ledger-head"><span class="label">'+mLong(m)+'</span>'
-      +'<span class="label">'+nStk(es.length,a==='self'?'Auftrag':'Eintrag',a==='self'?'Aufträge':'Einträge')+'</span></div>'
+      +'<span class="label">'+nStk(es.length,wortFuer(a)[0],wortFuer(a)[1])+'</span></div>'
       +es.map(rowHTML).join('')+sumbar(a,es)+'</div>';
   }
-  var offen=es.filter(function(e){return !e.paid&&zaehlt(e);});
+  var offen=hatAbrechnung(a)?es.filter(function(e){return !e.paid&&zaehlt(e);}):[];
   if(offen.length) h+='<button class="settle-btn" onclick="A.openSettle()">Monat abrechnen · '+eur(add(offen.map(offenOf)))+'</button>';
   payFor(a,m).filter(function(p){return !p.single;}).forEach(function(p){
     h+='<div class="settled"><div class="settled-t">Abgerechnet am '+dShort(p.date)+' · '+eur(p.got)+'</div>'
@@ -858,21 +961,25 @@ function jahrHTML(a){
   var kacheln = a==='martin'
     ? [['Einträge',String(s.n)],['Zeit',hm(s.zeit)+' Std'],['Bezahlte Zeit',hm(s.bez)+' Std'],
        ['Gefahrene km',String(s.km)],['Betrag',eur(s.betrag)],['Offen',eur(s.offen)]]
+    : a==='ausgaben'
+    ? [['Posten',String(s.n)],['Ausgaben',eur(s.betrag)],['Mit Beleg',eur(s.belegt)],
+       ['Ohne Beleg',eur(s.ohneBeleg)],['Ø je Posten',eur(s.n?s.betrag/s.n:0)],
+       ['Größter Posten',eur(Math.max.apply(null,[0].concat(es.map(amountOf))))]]
     : [['Aufträge',String(s.nRel)+(s.storno?' +'+s.storno+' storno':'')],['Honorar',eur(s.betrag)],
        ['Anzahlungen',eur(s.anzahlung)],['Offen',eur(s.offen)],['Ausgaben',eur(s.ausgaben)],['Ergebnis',eur(s.ergebnis)]];
 
   var h='<div class="ledger"><div class="ledger-head"><span class="label">Jahr '+y+'</span>'
-    +'<span class="label">'+nStk(s.n,a==='self'?'Auftrag':'Eintrag',a==='self'?'Aufträge':'Einträge')+'</span></div>'
+    +'<span class="label">'+nStk(s.n,wortFuer(a)[0],wortFuer(a)[1])+'</span></div>'
     +'<div class="ytiles">'+kacheln.map(function(k){
       return '<div class="ytile"><div class="stat-k">'+esc(k[0])+'</div><div class="stat-v num">'+esc(k[1])+'</div></div>';
     }).join('')+'</div>';
 
   h+='<div class="ylist">'+[0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
       var key=y+'-'+p2(i+1), le=monthEntries(a,key), sm=summe(le);
-      var sub = le.length
-        ? (a==='martin' ? nStk(le.length,'Eintrag','Einträge')+' · '+hm(sm.bez)+' Std'
-           : nStk(sm.nRel,'Auftrag','Aufträge')+(sm.storno?' +'+sm.storno+' storno':''))
-        : '—';
+      var sub = !le.length ? '—'
+        : a==='martin'   ? nStk(le.length,'Eintrag','Einträge')+' · '+hm(sm.bez)+' Std'
+        : a==='ausgaben' ? nStk(le.length,'Posten','Posten')+(sm.ohneBeleg?' · '+eur0(sm.ohneBeleg)+' ohne Beleg':'')
+        :                  nStk(sm.nRel,'Auftrag','Aufträge')+(sm.storno?' +'+sm.storno+' storno':'');
       return '<div class="yrow'+(le.length?'':' leer')+'" onclick="A.zuMonat(\''+key+'\')">'
         +'<span class="yrow-m">'+mName(i)+'</span>'
         +'<span class="yrow-s">'+esc(sub)+'</span>'
@@ -881,7 +988,7 @@ function jahrHTML(a){
     }).join('')+'</div></div>';
 
   h+='<div class="panel"><div class="sec-head"><span class="label">'
-    +(a==='martin'?'Betrag pro Monat':'Honorar pro Monat')+' · '+y+'</span></div>'
+    +(a==='martin'?'Betrag pro Monat':a==='ausgaben'?'Ausgaben pro Monat':'Honorar pro Monat')+' · '+y+'</span></div>'
     +columnChart([0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
         // Im Jahresüberblick zählen alle Monate gleich – kein Hervorheben.
         var key=y+'-'+p2(i+1), sm=summe(monthEntries(a,key));
@@ -895,6 +1002,14 @@ function jahrHTML(a){
     });
     h+='<div class="panel"><div class="sec-head"><span class="label">Honorar nach Auftragsart · '+y+'</span></div>'
       +rowChart(nachArt,{width:chartW(),aria:'Honorar nach Auftragsart'})+'</div>';
+  }
+  if(a==='ausgaben'){
+    var nachKat=KATEGORIEN.map(function(x){
+      var g=es.filter(function(e){return e.kat===x;});
+      return {label:x,value:add(g.map(amountOf)),tip:nStk(g.length,'Posten','Posten')};
+    });
+    h+='<div class="panel"><div class="sec-head"><span class="label">Ausgaben nach Kategorie · '+y+'</span></div>'
+      +rowChart(nachKat,{width:chartW(),aria:'Ausgaben nach Kategorie'})+'</div>';
   }
   h+='<div class="ctr"><button class="linkbtn" onclick="A.openReport()">Jahresbericht als PDF sichern</button></div>';
   return h;
@@ -924,6 +1039,11 @@ function rowHTML(e){
     if(e.fotos) meta=(meta?meta+' · ':'')+e.fotos+' Fotos';
     rechts = dShort(e.date)+' · '+(e.modus==='kilometer' ? '—'
       : (e.timeMode==='range'&&e.start&&e.end ? e.start+'–'+e.end+' · '+hm(ph) : hm(ph)+' Std'));
+  }else if(e.area==='ausgaben'){
+    pillTxt=e.kat; pillC='var(--gold)';
+    what=e.bez||'—';
+    meta=[e.haendler,e.zahlart].filter(Boolean).join(' · ')||'—';
+    rechts = dShort(e.date);
   }else{
     pillTxt=e.art; pillC='var(--self)';
     what=e.client||'—';
@@ -932,7 +1052,9 @@ function rowHTML(e){
   }
   var storno = e.area==='self'&&e.status==='Storniert';
   return '<div class="row'+(storno?' storno':'')+'" onclick="A.openForm(\''+e.id+'\')">'
-    +'<button class="tick '+(e.paid?'on':'')+'" title="'+(e.paid?'Als offen markieren':'Abrechnen')+'" onclick="A.unpay(\''+e.id+'\',event)">'+(e.paid?'✓':'')+'</button>'
+    +(hatAbrechnung(e.area)
+      ? '<button class="tick '+(e.paid?'on':'')+'" title="'+(e.paid?'Als offen markieren':'Abrechnen')+'" onclick="A.unpay(\''+e.id+'\',event)">'+(e.paid?'✓':'')+'</button>'
+      : '<span class="tick tick-still" aria-hidden="true">€</span>')
     +'<div class="row-body">'
     +'<div class="row-l1"><span class="row-what"><span class="pill" style="background:'+pillC+';color:#fff">'+esc(pillTxt)+'</span>'+esc(what)+'</span>'
     +'<span class="row-amt num">'+eur(amt)+'</span></div>'
@@ -942,8 +1064,13 @@ function rowHTML(e){
       ? '<div class="row-l2"><span class="badges">'
         +'<span class="badge"><span class="dot '+STATUS_DOT[e.status]+'"></span>'+esc(e.status)+'</span>'
         +(storno?'':'<span class="badge"><span class="dot '+zahlDot(e)+'"></span>'+zahlStatus(e)+'</span>')
+        +'<span class="badge"><span class="dot '+UEBERGABE_DOT[e.uebergabe]+'"></span>'+esc(e.uebergabe)+'</span>'
         +'</span>'
         +'<span class="row-time num">'+(offenOf(e)?eur(offenOf(e))+' offen':'')+'</span></div>'
+      : e.area==='ausgaben'
+      ? '<div class="row-l2"><span class="badges">'
+        +'<span class="badge"><span class="dot '+(e.beleg?'dot-good':'dot-red')+'"></span>'
+        +(e.beleg?'Beleg vorhanden':'Beleg fehlt')+'</span></span><span></span></div>'
       : '')
     +(e.notiz?'<div class="row-note">'+esc(e.notiz)+'</div>':'')
     +'</div></div>';
@@ -953,13 +1080,17 @@ function sumbar(a,es){
   var s=summe(es);
   var zellen = a==='martin'
     ? [['Zeit',hm(s.zeit)],['Bezahlt',hm(s.bez)],['KM',String(s.km)],['Offen',eur(s.offen),s.offen?'var(--red)':'']]
+    : a==='ausgaben'
+    ? [['Posten',String(s.n)],['Mit Beleg',eur0(s.belegt)],['Ohne Beleg',eur0(s.ohneBeleg),s.ohneBeleg?'var(--red)':''],
+       ['Ø Posten',eur0(s.n?s.betrag/s.n:0)]]
     : [['Aufträge',String(s.nRel)],['Anzahlung',eur0(s.anzahlung)],['Ausgaben',eur0(s.ausgaben)],['Offen',eur0(s.offen),s.offen?'var(--red)':'']];
   return '<div class="sumbar"><div class="sumgrid">'
     +zellen.map(function(z){
       return '<div class="sumcell"><div class="stat-k">'+esc(z[0])+'</div>'
         +'<div class="stat-v num"'+(z[2]?' style="color:'+z[2]+'"':'')+'>'+esc(z[1])+'</div></div>';
     }).join('')
-    +'</div><div class="total-row"><span class="label">'+(a==='self'?'Honorar':'Summe')+'</span>'
+    +'</div><div class="total-row"><span class="label">'
+    +(a==='self'?'Honorar':a==='ausgaben'?'Ausgaben':'Summe')+'</span>'
     +'<span class="total-v num">'+eur(s.betrag)+'</span></div>'
     +(a==='self'&&s.ausgaben?'<div class="total-row" style="margin-top:6px;padding-top:6px">'
       +'<span class="label">Ergebnis nach Ausgaben</span><span class="stat-v num">'+eur(s.ergebnis)+'</span></div>':'')
@@ -986,7 +1117,36 @@ function sheetForm(){
   if(!ui.editId){
     b+='<div class="seg">'
       +'<button class="'+(ui.fArea==='self'?'on':'')+'" onclick="A.setArea(\'self\')">Auftrag</button>'
-      +'<button class="'+(ui.fArea==='martin'?'on':'')+'" onclick="A.setArea(\'martin\')">Martin</button></div>';
+      +'<button class="'+(ui.fArea==='martin'?'on':'')+'" onclick="A.setArea(\'martin\')">Anstellung</button>'
+      +'<button class="'+(ui.fArea==='ausgaben'?'on':'')+'" onclick="A.setArea(\'ausgaben\')">Ausgabe</button></div>';
+  }
+
+  if(ui.fArea==='ausgaben'){
+    var haendler=Array.from(new Set(areaEntries('ausgaben').map(function(x){return x.haendler;}).filter(Boolean)));
+    b+='<div class="f"><label>Was wurde gekauft / bezahlt</label>'
+      +'<input type="text" id="f-bez" value="'+esc(g('bez','bez'))+'" placeholder="z. B. Objektiv Sigma 35 mm">'
+      +(errs.bez?'<div class="err">'+errs.bez+'</div>':'')+'</div>';
+    b+='<div class="two"><div class="f"><label>Kategorie</label><select id="f-kat">'
+      +optionen(KATEGORIEN,g('kat','kat','Kamera & Objektive'))+'</select></div>'
+      +'<div class="f"><label>Datum</label><input type="date" id="f-date" value="'+g('date','date',today())+'"></div></div>'
+      +(errs.date?'<div class="err">'+errs.date+'</div>':'');
+    b+='<div class="two"><div class="f"><label>Betrag (€)</label>'
+      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-betrag" value="'+g('betrag','betrag')+'" oninput="A.liveCalc()">'
+      +(errs.betrag?'<div class="err">'+errs.betrag+'</div>':'')+'</div>'
+      +'<div class="f"><label>Zahlungsart</label><select id="f-zahlart">'
+      +optionen(ZAHLARTEN,g('zahlart','zahlart','Bankkarte'))+'</select></div></div>';
+    b+='<div class="f"><label>Händler / Anbieter</label>'
+      +'<input type="text" id="f-haendler" list="hl" value="'+esc(g('haendler','haendler'))+'" placeholder="z. B. Foto Erhardt">'
+      +'<datalist id="hl">'+haendler.map(function(x){return '<option value="'+esc(x)+'"></option>';}).join('')+'</datalist></div>';
+    var belegAn = ui.draft.beleg!==undefined ? ui.draft.beleg==='1' : (e?!!e.beleg:false);
+    b+='<div class="sw-row" onclick="A.toggleBeleg()"><span>Beleg / Rechnung vorhanden</span>'
+      +'<span class="sw"><input type="checkbox" id="f-beleg" '+(belegAn?'checked':'')+' onclick="event.stopPropagation();A.toggleBeleg(this)"><i></i></span></div>';
+    b+='<div class="calc" id="calc"></div>';
+    b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Seriennummer, Verwendungszweck, Garantie …">'+esc(g('notiz','notiz'))+'</textarea></div>';
+    var actsA='<div class="acts">'
+      +(ui.editId?'<button class="btn btn-line" style="color:var(--red)" onclick="A.trashEntry()">Papierkorb</button>':'')
+      +'<button class="btn btn-fill" onclick="A.saveForm()">Speichern</button></div>';
+    return shell(ui.editId?'Ausgabe bearbeiten':'Neue Betriebsausgabe',b,actsA);
   }
 
   if(ui.fArea==='self'){
@@ -1064,6 +1224,8 @@ function sheetForm(){
       +'<div class="f"><label>E-Mail</label><input type="email" id="f-mail" value="'+esc(g('mail','email'))+'"></div></div>';
     b+='<div class="two"><div class="f"><label>Rechnungsnr.</label><input type="text" id="f-rech" value="'+esc(g('rech','rechnung'))+'"></div>'
       +'<div class="f"><label>Anzahl Fotos</label><input type="number" inputmode="numeric" min="0" id="f-fotos" value="'+g('fotos','fotos')+'"></div></div>';
+    b+='<div class="f"><label>Übermittlung der Fotos</label><select id="f-ueber">'
+      +optionen(UEBERGABE,g('ueber','uebergabe',UEBERGABE[0]))+'</select></div>';
   }
 
   b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Besonderheiten, Absprachen …">'+esc(g('notiz','notiz'))+'</textarea></div>';
@@ -1141,7 +1303,11 @@ function sheetBackup(){
     +'<button class="btn btn-line btn-sm" onclick="A.exportCSV()">CSV-Tabelle</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.pickFile()">Sicherung einspielen</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.openRestore()">Text einfügen</button></div>';
-  b+='<div class="hint" style="margin-top:14px">Oder den Text kopieren und z. B. in den Notizen ablegen:</div>'
+  b+='<div class="hint" style="margin-top:16px"><b>Arbeitszeiten aus der Excel-Liste</b><br>'
+    +'Alle Zeilen für Martin seit Juni 2025 aus <i>Martin_Arbeitszeit.xlsx</i> – samt Zahlungsvermerken. '
+    +'Der Knopf ergänzt nur; mehrfaches Drücken legt nichts doppelt an.</div>'
+    +'<button class="btn btn-line btn-sm" id="xlbtn" onclick="A.importExcel()">Excel-Zeiten einspielen</button>';
+  b+='<div class="hint" style="margin-top:16px">Oder den Text kopieren und z. B. in den Notizen ablegen:</div>'
     +'<textarea class="ta" id="bk" readonly onclick="this.select()">'+esc(json)+'</textarea>';
   var acts='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Schließen</button>'
     +'<button class="btn btn-fill" id="bkbtn" onclick="A.copyBackup()">Kopieren</button></div>';
@@ -1178,14 +1344,15 @@ function sheetPw(){
   return shell('Passwort ändern',b,acts);
 }
 function sheetReport(){
-  var js=jahre(ui.repBereich==='self'?'self':'martin');
+  var js=jahre(BEREICHE.indexOf(ui.repBereich)>=0?ui.repBereich:'martin');
   if(!ui.repJahr||js.indexOf(ui.repJahr)<0) ui.repJahr=js[0];
   if(ui.repMonat==='') ui.repMonat=String(new Date().getMonth());
   var b='<div class="hint">Bericht mit Kennzahlen, Diagrammen und der vollständigen Tabelle. '
     +'In der Vorschau auf <b>Drucken</b> und im Druckdialog „Als PDF sichern“ wählen.</div>';
   b+='<div class="f"><label>Bereich</label><select id="rp-bereich" onchange="A.repChange()">'
-    +['self','martin','beide'].map(function(x){
-      return '<option value="'+x+'"'+(ui.repBereich===x?' selected':'')+'>'+(x==='beide'?'Beide Bereiche':areaName(x))+'</option>';}).join('')
+    +['self','martin','ausgaben','beide'].map(function(x){
+      return '<option value="'+x+'"'+(ui.repBereich===x?' selected':'')+'>'
+        +(x==='beide'?'Alle Bereiche':areaKurz(x))+'</option>';}).join('')
     +'</select></div>';
   b+='<div class="f"><label>Umfang</label><select id="rp-umfang" onchange="A.repChange()">'
     +[['monat','Einzelner Monat'],['jahr','Ganzes Jahr'],['alles','Alles (Gesamtarchiv)']].map(function(x){
@@ -1229,13 +1396,19 @@ function repTile(l,val,n){
 
 function reportBlock(area,list,titel){
   var s=summe(list);
-  var acc=area==='martin'?'#3F5D52':'#8C5F3F';
+  var acc=areaHex(area);
   var kacheln = area==='martin'
     ? [['Einträge',String(s.n),titel],['Zeit gesamt',hm(s.zeit)+' Std','tatsächlich gearbeitet'],
        ['Bezahlte Zeit',hm(s.bez)+' Std','Fahrzeit zu '+Math.round((settings.fahrFaktor||0)*100)+' %'],
        ['Gefahrene km',String(s.km)+' km','ab '+(settings.kmFrei||0)+' km vergütet'],
        ['Betrag',eur(s.betrag),'Summe im Zeitraum'],
        ['Davon offen',eur(s.offen),s.offen?'noch nicht abgerechnet':'alles abgerechnet']]
+    : area==='ausgaben'
+    ? [['Posten',String(s.n),titel],['Ausgaben',eur(s.betrag),'Summe im Zeitraum'],
+       ['Mit Beleg',eur(s.belegt),'belegt und ablegbar'],
+       ['Ohne Beleg',eur(s.ohneBeleg),s.ohneBeleg?'Beleg nachreichen':'alles belegt'],
+       ['Ø je Posten',eur(s.n?s.betrag/s.n:0),'Durchschnitt'],
+       ['Größter Posten',eur(Math.max.apply(null,[0].concat(list.map(amountOf)))),'teuerste Anschaffung']]
     : [['Aufträge',String(s.nRel),s.storno?s.storno+' storniert (zählen nicht)':titel],
        ['Honorar',eur(s.betrag),'ohne Stornos'],
        ['Anzahlungen',eur(s.anzahlung),'bereits erhalten'],
@@ -1257,6 +1430,12 @@ function reportBlock(area,list,titel){
       return {label:g.label,value:add(sub.map(amountOf)),tip:nStk(sub.length,'Zeile','Zeilen')};
     });
     h+='<div class="rep-sec"><h2>Betrag nach Art</h2>'+rowChart(nachArt,{width:1000,color:acc,aria:'Betrag nach Art'})+'</div>';
+  }else if(area==='ausgaben'){
+    h+='<div class="rep-sec"><h2>Ausgaben nach Kategorie</h2>'
+      +rowChart(KATEGORIEN.map(function(x){
+        var g=list.filter(function(e){return e.kat===x;});
+        return {label:x,value:add(g.map(amountOf)),tip:nStk(g.length,'Posten','Posten')};
+      }),{width:1000,color:acc,aria:'Ausgaben nach Kategorie'})+'</div>';
   }else{
     h+='<div class="rep-sec"><h2>Honorar nach Auftragsart</h2>'
       +rowChart(ARTEN.map(function(x){
@@ -1265,9 +1444,32 @@ function reportBlock(area,list,titel){
       }),{width:1000,color:acc,aria:'Honorar nach Auftragsart'})+'</div>';
   }
 
-  h+='<div class="rep-sec"><h2>'+(area==='self'?'Alle Aufträge im Zeitraum':'Alle Zeilen im Zeitraum')+'</h2>';
+  h+='<div class="rep-sec"><h2>'+(area==='self'?'Alle Aufträge im Zeitraum'
+      :area==='ausgaben'?'Alle Ausgaben im Zeitraum':'Alle Zeilen im Zeitraum')+'</h2>';
   if(!list.length) return h+'<p class="rep-note">In diesem Zeitraum wurde nichts erfasst.</p></div>';
 
+  if(area==='ausgaben'){
+    h+='<table class="rep-table"><thead><tr>'
+      +'<th>Datum</th><th>Bezeichnung</th><th>Kategorie</th><th>Händler / Anbieter</th>'
+      +'<th>Zahlungsart</th><th>Beleg</th><th class="rep-r">Betrag</th><th>Notiz</th></tr></thead><tbody>'
+      +list.map(function(e){
+        return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.bez||'')+'</td><td>'+esc(e.kat)+'</td>'
+          +'<td>'+esc(e.haendler||'')+'</td><td>'+esc(e.zahlart||'')+'</td>'
+          +'<td>'+(e.beleg?'✓':'fehlt')+'</td>'
+          +'<td class="rep-r">'+eur(amountOf(e))+'</td><td>'+esc(e.notiz||'')+'</td></tr>';
+      }).join('')
+      +'</tbody><tfoot><tr><td colspan="6">SUMME</td>'
+      +'<td class="rep-r">'+eur(s.betrag)+'</td><td></td></tr></tfoot></table></div>';
+    if(s.ohneBeleg){
+      h+='<div class="rep-sec"><h2>Belege nachreichen</h2><table class="rep-table"><tbody>'
+        +list.filter(function(e){return !e.beleg;}).map(function(e){
+          return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.bez||'')+'</td><td>'+esc(e.haendler||'')+'</td>'
+            +'<td class="rep-r">'+eur(amountOf(e))+'</td></tr>';}).join('')
+        +'</tbody><tfoot><tr><td colspan="3">Summe ohne Beleg</td>'
+        +'<td class="rep-r">'+eur(s.ohneBeleg)+'</td></tr></tfoot></table></div>';
+    }
+    return h;
+  }
   if(area==='martin'){
     h+='<table class="rep-table"><thead><tr>'
       +'<th>Art</th><th>Fahrzeit / regulär</th><th>Datum</th><th>Beginn</th><th>Ende</th>'
@@ -1295,7 +1497,7 @@ function reportBlock(area,list,titel){
       +'<th>Datum</th><th>Kunde</th><th>Auftragsart</th><th>Ort</th><th>Was</th>'
       +'<th class="rep-r">Zeit</th><th>Abrechnung</th><th class="rep-r">Honorar</th>'
       +'<th class="rep-r">Anzahlung</th><th class="rep-r">Ausgaben</th><th class="rep-r">Offen</th>'
-      +'<th>Status</th><th>Rechnungsnr</th><th>Kommentar</th></tr></thead><tbody>'
+      +'<th>Status</th><th>Fotoübergabe</th><th>Rechnungsnr</th><th>Kommentar</th></tr></thead><tbody>'
       +list.map(function(e){
         var st=e.status==='Storniert';
         return '<tr'+(st?' style="color:#9A938A"':'')+'><td>'+dShort(e.date)+'</td><td>'+esc(e.client||'')+'</td>'
@@ -1306,18 +1508,19 @@ function reportBlock(area,list,titel){
           +'<td class="rep-r">'+(anzOf(e)?eur(anzOf(e)):'')+'</td>'
           +'<td class="rep-r">'+(ausgOf(e)?eur(ausgOf(e)):'')+'</td>'
           +'<td class="rep-r">'+(offenOf(e)?eur(offenOf(e)):'—')+'</td>'
-          +'<td>'+esc(e.status)+'</td><td>'+esc(e.rechnung||'')+'</td>'
+          +'<td>'+esc(e.status)+'</td><td>'+esc(e.uebergabe||'')+'</td><td>'+esc(e.rechnung||'')+'</td>'
           +'<td>'+esc(e.notiz||'')+'</td></tr>';
       }).join('')
       +'</tbody><tfoot><tr><td colspan="7">SUMME (ohne Stornos)</td>'
       +'<td class="rep-r">'+eur(s.betrag)+'</td><td class="rep-r">'+eur(s.anzahlung)+'</td>'
       +'<td class="rep-r">'+eur(s.ausgaben)+'</td><td class="rep-r">'+eur(s.offen)+'</td>'
-      +'<td colspan="3"></td></tr></tfoot></table>';
+      +'<td colspan="4"></td></tr></tfoot></table>';
   }
   h+='</div>';
 
   var offen=list.filter(function(e){return !e.paid&&zaehlt(e);});
   var wort=area==='self'?['Der einzige Auftrag','Aufträge']:['Die einzige Zeile','Zeilen'];
+  if(area==='ausgaben') wort=['Der einzige Posten','Posten'];
   if(offen.length===list.filter(zaehlt).length&&offen.length){
     h+='<div class="rep-sec"><h2>Noch offen</h2><p class="rep-note">'
       +(offen.length===1 ? wort[0]+' dieses Zeitraums ist noch offen: '
@@ -1335,7 +1538,7 @@ function reportBlock(area,list,titel){
 
 function showReport(){
   repChange();
-  var bereiche = ui.repBereich==='beide' ? ['self','martin'] : [ui.repBereich];
+  var bereiche = ui.repBereich==='beide' ? BEREICHE : [ui.repBereich];
   var umfang=ui.repUmfang, jahr=ui.repJahr, monat=Number(ui.repMonat);
   var titel, kurz;
 
@@ -1384,11 +1587,12 @@ function showReport(){
 
   var h='<div class="rep-head"><div><h1>Auftragsbuch</h1>'
     +'<div class="rep-sub">'+esc(kurz)+' · '+esc(titel)+' · '
-    +esc(ui.repBereich==='beide'?'Aufträge und Martin':areaName(ui.repBereich))+'</div></div>'
+    +esc(ui.repBereich==='beide'?'Alle Bereiche':areaName(ui.repBereich))+'</div></div>'
     +'<div class="rep-meta">Erstellt am '+esc(stamp())+'<br>'+g.n+' Zeilen · '+eur(g.betrag)+'<br>Sicherungsdokument</div></div>';
 
   h+='<div class="rep-sec"><h2>'+esc(vTitel)+'</h2>'
-    +columnChart(verlauf,{width:1000,height:180,aria:vTitel,color:'#3F5D52'})+'</div>';
+    +columnChart(verlauf,{width:1000,height:180,aria:vTitel,
+        color:bereiche.length===1?areaHex(bereiche[0]):'#3F5D52'})+'</div>';
 
   bereiche.forEach(function(a){ h+=reportBlock(a,listFor(a),titel); });
 
@@ -1527,8 +1731,9 @@ function boot(){ ui.view='home'; ui.month=curMk(); ui.jahr=curY(); ui.modus='mon
 
 function render(){
   if(!cryptoKey) return;
-  document.documentElement.style.setProperty('--accent', ui.area==='self'?'var(--self)':'var(--martin)');
-  document.documentElement.style.setProperty('--accent-soft', ui.area==='self'?'var(--self-soft)':'var(--martin-soft)');
+  document.documentElement.style.setProperty('--accent', areaFarbe(ui.area));
+  document.documentElement.style.setProperty('--accent-soft',
+    ui.area==='self'?'var(--self-soft)':ui.area==='ausgaben'?'var(--gold-soft)':'var(--martin-soft)');
   var h = ui.view==='home' ? viewHome() : viewArea();
   h += ui.sheet==='form'? sheetForm() : ui.sheet==='settle'? sheetSettle() : ui.sheet==='settings'? sheetSettings()
      : ui.sheet==='backup'? sheetBackup() : ui.sheet==='restore'? sheetRestore() : ui.sheet==='reset'? sheetReset()
@@ -1547,6 +1752,7 @@ window.A={
   openSettings:openSettings,saveSettingsForm:saveSettingsForm,addSatz:addSatz,delSatz:delSatz,
   openBackup:openBackup,copyBackup:copyBackup,exportJSON:exportJSON,exportCSV:exportCSV,
   openRestore:openRestore,applyRestore:applyRestore,importDatei:importDatei,pickFile:pickFile,
+  importExcel:importExcel,toggleBeleg:toggleBeleg,
   openTrash:openTrash,legacyEntfernen:legacyEntfernen,
   openReset:openReset,checkWipe:checkWipe,doWipe:doWipe,
   openPw:openPw,changePw:changePw,setPw:setPw,checkPw:checkPw,

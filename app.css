@@ -17,7 +17,8 @@
   --martin-soft:#E3EAE5;
   --self:#8C5F3F;
   --self-soft:#F0E5DC;
-  --gold:#A88A5C;
+  --gold:#8A6E42;
+  --gold-soft:#EFE7D8;
   --red:#9E5445;
   --red-soft:#F1E2DD;
   --green:#4A6B4A;
@@ -83,7 +84,9 @@ h1,h2,h3,p{margin:0;}
 .topbar-inner{max-width:560px;margin:0 auto;}
 .topbar-row{display:flex;align-items:center;gap:10px;padding-bottom:10px;}
 .back{background:none;border:none;padding:6px 6px 6px 0;color:var(--ink-2);font-size:17px;cursor:pointer;}
-.topbar-title{font-size:17px;font-weight:600;flex:1;letter-spacing:-.01em;}
+.topbar-title{font-size:17px;font-weight:600;flex:1;letter-spacing:-.01em;min-width:0;}
+/* Lange Bereichsnamen dürfen schrumpfen statt die Knöpfe zu verdrängen. */
+.topbar-title.lang{font-size:14px;line-height:1.2;}
 .iconbtn{background:none;border:none;padding:6px;color:var(--ink-2);cursor:pointer;font-size:16px;line-height:1;}
 .iconbtn.on{color:var(--accent);}
 
@@ -157,6 +160,8 @@ h1,h2,h3,p{margin:0;}
   font-size:13px;color:var(--ink-3);cursor:pointer;padding:0;
 }
 .tick.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+/* Betriebsausgaben werden nicht abgerechnet – Platzhalter statt Häkchen. */
+.tick-still{border-style:dashed;color:var(--ink-3);font-size:12px;cursor:default;}
 .row-body{flex:1;min-width:0;}
 .row-l1{display:flex;justify-content:space-between;gap:10px;align-items:baseline;}
 .row-what{font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}

@@ -1,10 +1,14 @@
-# Auftragsbuch · Aufträge & Arbeitszeit
+# Auftragsbuch · Aufträge, Arbeitszeit & Ausgaben
 
-Zwei Bücher in einer App, beide nach **Monaten und Jahren** gegliedert:
+Drei Bücher in einer App, alle nach **Monaten und Jahren** gegliedert:
 
-- **Aufträge** – eigene Aufträge mit Kunde, Auftragsart, Ort, Kontakt, Honorar,
-  Anzahlung, Ausgaben, Rechnungsnummer und Auftragsstatus.
-- **Martin** – Arbeitszeit der Anstellung mit Stundensatz, Fahrzeit und Fahrtgeld.
+- **Selbstständigkeit** – eigene Aufträge mit Kunde, Auftragsart, Ort, Kontakt,
+  Honorar, Anzahlung, Ausgaben, Rechnungsnummer, Auftragsstatus und der
+  Übermittlung der Fotos.
+- **Anstellung – Martin Slovaczek** – Arbeitszeiten mit Stundensatz, Fahrzeit
+  und Fahrtgeld.
+- **Betriebsausgaben** – Anschaffungen und Kosten der Selbstständigkeit, von der
+  Gewerbeanmeldung bis zum Objektiv.
 
 Läuft vollständig im Browser: kein Server, kein Konto, keine Cloud. Alle Daten
 liegen verschlüsselt auf dem Gerät. Monats-, Jahres- und Gesamtberichte lassen
@@ -106,7 +110,12 @@ Filter nach Auftragsart und Status dazu.
 | Abrechnung | **Festbetrag** oder **Stundensatz** |
 | Anzahlung | Bereits erhaltener Teilbetrag |
 | Ausgaben | Auslagen für diesen Auftrag |
+| Übermittlung der Fotos | noch nicht übergeben · Dropbox · USB-Stick · Sonstiges |
 | Ort, Telefon, E-Mail, Rechnungsnr., Fotos, Notiz | Freitext |
+
+Die Übermittlung steht als Marke direkt in der Auftragszeile. Solange ein
+Auftrag auf *„noch nicht übergeben"* steht, siehst du auf einen Blick, wo die
+Fotos noch rausmüssen.
 
 **Rechenregeln:**
 - Stornierte Aufträge zählen **nirgends** mit – nicht im Honorar, nicht im
@@ -152,6 +161,28 @@ Fahrzeit und der Standard-Stundensatz für eigene Aufträge.
 
 ---
 
+## 5b. Betriebsausgaben
+
+**+ Ausgabe** im dritten Bereich. Für alles, was die Selbstständigkeit kostet:
+
+| Feld | Wofür |
+|---|---|
+| Was wurde gekauft / bezahlt | Pflichtfeld, z. B. „Sigma 35 mm f/1.4" |
+| Kategorie | Gewerbe & Behörden · Kamera & Objektive · Blitz & Licht · Speicher & Festplatten · Stativ & Zubehör · Akkus & Strom · Software & Abos · Versicherung · Weiterbildung · Werbung & Web · Büro & Porto · Fahrtkosten · Sonstiges |
+| Betrag | Pflichtfeld |
+| Zahlungsart | Bankkarte · Bar · Überweisung · PayPal · Rechnung · Sonstiges |
+| Händler / Anbieter | mit Vorschlägen aus bisherigen Einkäufen |
+| Beleg / Rechnung vorhanden | Schalter |
+| Notiz | Seriennummer, Verwendungszweck, Garantie … |
+
+Die Jahresansicht zeigt Summe, Durchschnitt, größten Posten und – wichtig für
+die Steuer – wie viel noch **ohne Beleg** dasteht. Der Bericht hat dafür einen
+eigenen Abschnitt *„Belege nachreichen"*.
+
+Betriebsausgaben werden nicht abgerechnet; statt des Häkchens steht dort ein €-Zeichen.
+
+---
+
 ## 6. Abrechnen
 
 Ein Tipp auf das **Kästchen links** rechnet eine einzelne Zeile ab, **Monat
@@ -168,7 +199,7 @@ im Bericht ausgewiesen.
 
 *Bericht & PDF* (Startseite oder das ▤ in der Bereichsansicht):
 
-1. **Bereich**: Aufträge, Martin oder beide.
+1. **Bereich**: Selbstständigkeit, Anstellung, Betriebsausgaben oder alle.
 2. **Umfang**: einzelner Monat, ganzes Jahr oder alles.
 3. **Bericht anzeigen** → Vorschau.
 4. **Drucken / als PDF sichern** → im Druckdialog „Als PDF sichern".
@@ -185,6 +216,17 @@ Was, Name Hochzeitspaar, Kommentar.*
 
 Empfehlung: am Monatsende einmal den Monatsbericht sichern. So wächst ein
 lückenloses PDF-Archiv, unabhängig von der App.
+
+### Arbeitszeiten aus der Excel-Liste
+
+Unter *Sicherung* liegt der Knopf **„Excel-Zeiten einspielen"**. Er lädt alle
+69 Zeilen für Martin seit Juni 2025 aus `daten/martin-arbeitszeit.json` – das
+ist die aus `Martin_Arbeitszeit.xlsx` erzeugte Sicherung, samt der
+Zahlungsvermerke der einzelnen Blätter. Der Knopf **ergänzt nur**; mehrfaches
+Drücken legt nichts doppelt an. Er funktioniert nur, wenn die Seite über eine
+Web-Adresse geöffnet ist (GitHub Pages), nicht als lokale Datei.
+
+Zwei Dinge, die beim Einlesen aufgefallen sind, stehen in Abschnitt 11.
 
 ### Datensicherung
 
@@ -258,8 +300,37 @@ Kilometer   bezahlte Zeit = 0                       Betrag = (km − 20) × 0,20
 Gerechnet wird immer mit der exakten Zeit, nicht mit der auf zwei Stellen
 gerundeten Anzeige.
 
-Der Auftrags-Bereich heißt intern weiterhin `self`, damit ältere Sicherungen
-unverändert passen.
+Der Bereich „Selbstständigkeit" heißt intern weiterhin `self`, damit ältere
+Sicherungen unverändert passen.
+
+Der laufende Monat und das laufende Jahr richten sich immer nach dem Datum des
+Geräts – im Juli steht Juli, im August August. Nichts davon ist fest hinterlegt.
+
+---
+
+## 11. Was beim Einlesen der Excel-Liste aufgefallen ist
+
+Die App rechnet jede Zeile mit dem Satz, der an ihrem Datum galt. Dabei sind
+**12 von 69 Zeilen** aufgefallen, die im Blatt anders gerechnet waren –
+zusammen **+94,67 €** zu deinen Gunsten:
+
+| Ursache | Zeilen | Summe |
+|---|---|---|
+| Juni 2026 mit 17,50 € bzw. 20 € statt 23 € gerechnet | 9 | **+118,29 €** |
+| September 2025 mit 20 € statt 17,50 € gerechnet | 2 | −8,13 € |
+| Ausschank Oberdolling 25.07.2025: 17:00–00:40 ergibt 7:40, das Blatt rechnet 8:40 | 1 | −15,50 € |
+
+Beim letzten Punkt ist vermutlich die Endzeit vertippt (01:40 statt 00:40) –
+das lässt sich im Eintrag mit zwei Tipps korrigieren.
+
+Außerdem korrigiert: im Blatt „Mai Juni 2026" stand bei einer Zeile das Datum
+**2025**-05-26 zwischen lauter 2026er Zeilen; sie wurde als **2026**-05-26
+übernommen.
+
+Die Zahlungen der Blätter sind als Abrechnungen hinterlegt. Wo ein Blatt nur
+teilweise bezahlt war, sind die ältesten Zeilen als bezahlt markiert, bis der
+gezahlte Betrag gedeckt ist – der Rest bleibt offen. Jede Zeile lässt sich über
+das Häkchen einzeln umstellen.
 
 Nach einer Änderung an den Dateien die Version in `sw.js` (`CACHE`) hochzählen,
 damit installierte Geräte die neue Fassung laden.
