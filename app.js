@@ -45,7 +45,10 @@ var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Spei
 var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v7 · 15.08.2026';
+var APP_VERSION='v8 · 15.08.2026';
+/* Kennzeichen des Excel-Stands. Wird nach dem einmaligen Übernehmen in den
+   Einstellungen vermerkt, damit es nicht bei jedem Start erneut passiert. */
+var XL_STAND='martin-arbeitszeit-2026-08-15';
 
 var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
 
@@ -54,7 +57,7 @@ var ui={
   sheet:null, editId:null, settleScope:null,
   sucheAn:false, suche:'', fArt:'', fStatus:'',
   fArea:'martin', fArt2:'fotografisch', fModus:'regulaer', fTime:'range', fBilling:'fix',
-  errs:{}, draft:{}, saveErr:false, legacyOffen:false,
+  errs:{}, draft:{}, saveErr:false, legacyOffen:false, xlNeu:0,
   repBereich:'martin', repUmfang:'monat', repJahr:'', repMonat:'', repOffen:false
 };
 
@@ -729,6 +732,30 @@ function applyRestore(){
   if(!mergeDaten(d,'der Zwischenablage')) return;
   ui.sheet=null; render(); save();
 }
+/* Beim ersten Start die Arbeitszeiten aus der Excel-Liste selbst übernehmen.
+   Es wird ausschließlich ergänzt – vorhandene oder in den Papierkorb gelegte
+   Einträge bleiben unangetastet. Danach merkt sich die App den Stand. */
+function autoImport(){
+  if(settings.xlStand===XL_STAND) return;
+  fetch(IMPORT_DATEI,{cache:'no-store'})
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(d){
+      var vorh={}; entries.forEach(function(e){ vorh[e.id]=1; });
+      var neu=0;
+      (d.entries||[]).map(normEntry).forEach(function(e){
+        if(!vorh[e.id]){ entries.push(e); neu++; }
+      });
+      var pv={}; payments.forEach(function(p){ pv[p.id]=1; });
+      (d.payments||[]).forEach(function(p){ if(p&&p.id&&!pv[p.id]) payments.push(p); });
+      settings.xlStand=XL_STAND;
+      ui.xlNeu=neu;
+      render();
+      if(neu) save();
+    })
+    .catch(function(){ /* ohne Verbindung oder lokal geöffnet: der Knopf bleibt */ });
+}
+function xlWeg(){ ui.xlNeu=0; render(); }
+
 /* Die aus Martin_Arbeitszeit.xlsx erzeugte Sicherung liegt neben der App. */
 function importExcel(){
   var btn=document.getElementById('xlbtn');
@@ -736,7 +763,9 @@ function importExcel(){
   fetch(IMPORT_DATEI,{cache:'no-store'})
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(d){
-      if(mergeDaten(d,'der Excel-Liste „Martin Arbeitszeit“')){ ui.sheet=null; render(); save(); }
+      if(mergeDaten(d,'der Excel-Liste „Martin Arbeitszeit“')){
+        settings.xlStand=XL_STAND; ui.sheet=null; render(); save();
+      }
       else render();
     })
     .catch(function(x){
@@ -825,6 +854,9 @@ function cameraSVG(){
 
 function banners(){
   var h='';
+  if(ui.xlNeu) h+='<div class="banner banner-ok"><b>'+ui.xlNeu+' Arbeitszeiten übernommen.</b> '
+    +'Alle Zeilen für Martin aus der Excel-Liste, Juni 2025 bis August 2026. '
+    +'<button class="linkbtn" style="color:inherit" onclick="A.xlWeg()">Verstanden</button></div>';
   if(ui.saveErr) h+='<div class="banner">Speichern fehlgeschlagen. Bitte lade sofort eine Sicherung herunter.</div>';
   if(ui.legacyOffen) h+='<div class="banner banner-warn">Deine bisherigen Daten wurden übernommen und verschlüsselt. '
     +'Die alte, <b>unverschlüsselte</b> Kopie liegt noch im Browser-Speicher.'
@@ -1766,7 +1798,10 @@ function resetLock(){
 /* ============ rahmen ============ */
 
 /* Nach Anlegen und nach jedem Entsperren auf der Startseite beginnen. */
-function boot(){ ui.view='home'; ui.month=curMk(); ui.jahr=curY(); ui.modus='monat'; render(); resetLock(); }
+function boot(){
+  ui.view='home'; ui.month=curMk(); ui.jahr=curY(); ui.modus='monat';
+  render(); resetLock(); autoImport();
+}
 
 function render(){
   if(!cryptoKey) return;
@@ -1792,7 +1827,7 @@ window.A={
   openBackup:openBackup,copyBackup:copyBackup,exportJSON:exportJSON,exportCSV:exportCSV,
   openRestore:openRestore,applyRestore:applyRestore,importDatei:importDatei,pickFile:pickFile,
   importExcel:importExcel,toggleBeleg:toggleBeleg,
-  openTrash:openTrash,legacyEntfernen:legacyEntfernen,aktualisieren:aktualisieren,
+  openTrash:openTrash,legacyEntfernen:legacyEntfernen,aktualisieren:aktualisieren,xlWeg:xlWeg,
   openReset:openReset,checkWipe:checkWipe,doWipe:doWipe,
   openPw:openPw,changePw:changePw,setPw:setPw,checkPw:checkPw,
   openReport:openReport,repChange:repChange,showReport:showReport,closeReport:closeReport

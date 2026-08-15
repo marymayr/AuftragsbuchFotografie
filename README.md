@@ -224,14 +224,20 @@ lückenloses PDF-Archiv, unabhängig von der App.
 
 ### Arbeitszeiten aus der Excel-Liste
 
-Unter *Sicherung* liegt der Knopf **„Excel-Zeiten einspielen"**. Er lädt alle
-69 Zeilen für Martin seit Juni 2025 aus `daten/martin-arbeitszeit.json` – das
-ist die aus `Martin_Arbeitszeit.xlsx` erzeugte Sicherung, samt der
-Zahlungsvermerke der einzelnen Blätter. Der Knopf **ergänzt nur**; mehrfaches
-Drücken legt nichts doppelt an. Er funktioniert nur, wenn die Seite über eine
-Web-Adresse geöffnet ist (GitHub Pages), nicht als lokale Datei.
+Die **69 Zeilen für Martin seit Juni 2025** übernimmt die App beim ersten
+Öffnen **von selbst** aus `daten/martin-arbeitszeit.json` – das ist die aus
+`Martin_Arbeitszeit.xlsx` erzeugte Sicherung, samt der neun Zahlungsvermerke
+der einzelnen Blätter. Ein grüner Hinweis meldet, wie viele Zeilen dazukamen.
 
-Zwei Dinge, die beim Einlesen aufgefallen sind, stehen in Abschnitt 11.
+Das passiert genau einmal: Der Stand wird in den Einstellungen vermerkt
+(`xlStand`). Danach wird nur noch ergänzt, was noch fehlt – bereits vorhandene
+und in den Papierkorb gelegte Zeilen bleiben unangetastet.
+
+Unter *Sicherung* gibt es zusätzlich den Knopf **„Excel-Zeiten einspielen"**,
+falls man es von Hand anstoßen will. Beides funktioniert nur, wenn die Seite
+über eine Web-Adresse geöffnet ist (GitHub Pages), nicht als lokale Datei.
+
+Was beim Einlesen auffiel, steht in Abschnitt 11.
 
 ### Datensicherung
 

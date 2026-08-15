@@ -331,3 +331,5 @@ body.report-open #app{display:none;}
   .rep-cols{grid-template-columns:1fr;}
   .report{padding:14px;margin:12px auto 40px;}
 }
+
+.banner-ok{background:#E3EAE5;border:1px solid #C4D4CB;color:#2F4A3F;}
