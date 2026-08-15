@@ -13,7 +13,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
-<link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="app.css?v=11">
 </head>
 <body>
 
@@ -30,7 +30,7 @@
 </div>
 <div id="report" class="report" hidden></div>
 
-<script src="app.js"></script>
+<script src="app.js?v=11"></script>
 <script>
 if('serviceWorker' in navigator){
   window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});

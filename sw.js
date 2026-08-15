@@ -1,8 +1,8 @@
 /* Service Worker – macht das Auftragsbuch offline verfügbar.
    Die Version bei jeder Änderung hochzählen, damit alte Dateien weichen. */
-var CACHE = 'auftragsbuch-v10';
+var CACHE = 'auftragsbuch-v11';
 var ASSETS = [
-  './', './index.html', './app.css', './app.js', './manifest.json',
+  './', './index.html', './app.css?v=11', './app.js?v=11', './manifest.json',
   './daten/martin-arbeitszeit.json',
   './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './icon-512-maskable.png'
 ];
@@ -52,8 +52,11 @@ self.addEventListener('fetch', function (e) {
     return;
   }
 
+  /* 'no-cache' heißt: immer beim Server rückfragen. Ohne das darf der
+     Browser aus seinem eigenen Zwischenspeicher antworten – dann käme trotz
+     Netzwerk-zuerst weiterhin die alte Fassung. */
   e.respondWith(
-    fetch(e.request).then(merken).catch(function () {
+    fetch(e.request, { cache: 'no-cache' }).then(merken).catch(function () {
       return caches.match(e.request).then(function (hit) {
         if (hit) return hit;
         if (e.request.mode === 'navigate') return caches.match('./index.html');

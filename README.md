@@ -370,5 +370,15 @@ Unter *Sätze & Einstellungen* stehen ganz unten die laufende **Fassung** und de
 Knopf **„Auf neue Fassung prüfen"**. Er leert den Offline-Zwischenspeicher und
 lädt neu; die Einträge im verschlüsselten Speicher bleiben unangetastet.
 
-Nach einer Änderung an den Dateien die Version in `sw.js` (`CACHE`) und
-`APP_VERSION` in `app.js` hochzählen.
+**Nach jeder Änderung drei Stellen hochzählen:**
+
+1. `?v=` an `app.css` und `app.js` in `index.html`
+2. dieselben `?v=`-Adressen in der `ASSETS`-Liste von `sw.js`, dazu `CACHE`
+3. `APP_VERSION` in `app.js`
+
+Der Versionsstempel in der Adresse ist der entscheidende Teil: `app.js?v=12` ist
+für jeden Zwischenspeicher eine **neue Adresse** und kann nicht mit einer alten
+Fassung beantwortet werden – auch nicht von einem noch installierten älteren
+Service Worker. Ohne ihn genügt „netzwerk-zuerst“ nicht, weil `fetch()` sonst
+aus dem HTTP-Zwischenspeicher des Browsers bedient werden darf; GitHub Pages
+setzt darauf zehn Minuten Gültigkeit.

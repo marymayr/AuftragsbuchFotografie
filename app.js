@@ -45,7 +45,7 @@ var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Spei
 var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v10 · 15.08.2026';
+var APP_VERSION='v11 · 15.08.2026';
 /* Kennzeichen des Excel-Stands. Wird nach dem einmaligen Übernehmen in den
    Einstellungen vermerkt, damit es nicht bei jedem Start erneut passiert. */
 var XL_STAND='martin-arbeitszeit-bezahlt-bis-2026-07-25';
