@@ -1,6 +1,11 @@
 /* ============================================================================
-   Auftragsbuch – Arbeitszeit & Honorar
+   Auftragsbuch – Aufträge & Arbeitszeit
    ---------------------------------------------------------------------------
+   Zwei Bereiche in einem Buch:
+     • Aufträge  – eigene Aufträge mit Kunde, Honorar, Anzahlung, Status
+     • Martin    – Arbeitszeit mit Stundensatz, Fahrzeit und Fahrtgeld
+   Beides lässt sich nach Monaten und nach Jahren gliedern.
+
    Läuft vollständig im Browser. Alle Daten liegen AES-GCM-verschlüsselt im
    localStorage; der Schlüssel wird per PBKDF2 aus dem Passwort abgeleitet und
    nirgends gespeichert.
@@ -24,12 +29,18 @@ var DEF_SAETZE=[
 ];
 var DEF_SETTINGS={ kmRate:0.20, kmFrei:20, fahrFaktor:0.5, rateSelf:0, saetze:null };
 
+var ARTEN=['Hochzeit','Portrait','Familie','Business','Event','Produkt','Immobilien','Tiere','Sonstiges'];
+var STATUS=['Anfrage','Bestätigt','Durchgeführt','Abgeschlossen','Storniert'];
+var STATUS_DOT={'Anfrage':'dot-muted','Bestätigt':'dot-accent','Durchgeführt':'dot-gold',
+                'Abgeschlossen':'dot-good','Storniert':'dot-red'};
+
 var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
 
 var ui={
-  view:'home', area:'martin', month:null,
+  view:'home', area:'martin', month:null, jahr:'', modus:'monat',
   sheet:null, editId:null, settleScope:null,
-  fArea:'martin', fArt:'fotografisch', fModus:'regulaer', fTime:'range', fBilling:'fix',
+  sucheAn:false, suche:'', fArt:'', fStatus:'',
+  fArea:'martin', fArt2:'fotografisch', fModus:'regulaer', fTime:'range', fBilling:'fix',
   errs:{}, draft:{}, saveErr:false, legacyOffen:false,
   repBereich:'martin', repUmfang:'monat', repJahr:'', repMonat:'', repOffen:false
 };
@@ -40,7 +51,9 @@ function p2(n){return String(n).padStart(2,'0');}
 function today(){var d=new Date();return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());}
 function mk(iso){return iso?iso.slice(0,7):'';}
 function curMk(){return mk(today());}
+function curY(){return String(new Date().getFullYear());}
 function mLong(k){var a=k.split('-').map(Number);return new Date(a[0],a[1]-1,1).toLocaleDateString('de-DE',{month:'long',year:'numeric'});}
+function mName(i){return new Date(2000,i,1).toLocaleDateString('de-DE',{month:'long'});}
 function mShort(k){var a=k.split('-').map(Number);var d=new Date(a[0],a[1]-1,1);return d.toLocaleDateString('de-DE',{month:'short'})+' '+String(a[0]).slice(2);}
 function mMini(k){var a=k.split('-').map(Number);return new Date(a[0],a[1]-1,1).toLocaleDateString('de-DE',{month:'short'});}
 function dShort(iso){if(!iso)return'';var a=iso.split('-').map(Number);return p2(a[2])+'.'+p2(a[1])+'.'+String(a[0]).slice(2);}
@@ -93,16 +106,15 @@ function decryptFrom(raw,key){
   return crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(o.iv)},key,unb64(o.ct))
     .then(function(pl){return JSON.parse(TD.decode(pl));});
 }
-
 function persist(){
   return encryptTo({entries:entries,payments:payments,settings:settings,geaendert:nowISO()},cryptoKey)
     .then(function(s){ localStorage.setItem(K_VAULT,s); ui.saveErr=false; });
 }
-function save(){
-  return persist().catch(function(){ ui.saveErr=true; render(); });
-}
+function save(){ return persist().catch(function(){ ui.saveErr=true; render(); }); }
 
-/* ============ datenmodell ============ */
+/* ============ datenmodell ============
+   Der Auftrags-Bereich heißt intern weiterhin 'self', damit ältere
+   Sicherungen und Daten aus der Vorfassung unverändert passen.          */
 
 function normEntry(o){
   var e={
@@ -124,8 +136,15 @@ function normEntry(o){
     e.km=Number(o.km)||0; e.name=o.name||'';
     if(o.fotos) e.fotos=Number(o.fotos)||0;
   }else{
-    e.client=o.client||''; e.billing=o.billing==='hourly'?'hourly':'fix';
+    e.client=o.client||'';
+    e.art=ARTEN.indexOf(o.art)>=0?o.art:'Sonstiges';
+    e.status=STATUS.indexOf(o.status)>=0?o.status:(o.paid?'Abgeschlossen':'Bestätigt');
+    e.ort=o.ort||''; e.telefon=o.telefon||''; e.email=o.email||'';
+    e.billing=o.billing==='hourly'?'hourly':'fix';
     e.amount=Number(o.amount)||0; e.rate=Number(o.rate)||0;
+    e.anzahlung=Number(o.anzahlung)||0; e.ausgaben=Number(o.ausgaben)||0;
+    e.rechnung=o.rechnung||'';
+    if(o.fotos) e.fotos=Number(o.fotos)||0;
   }
   return e;
 }
@@ -134,11 +153,9 @@ function normSettings(s){
   var sz=(out.saetze&&out.saetze.length)?out.saetze:null;
   if(!sz){
     sz=DEF_SAETZE.map(function(x){return Object.assign({},x);});
-    // Flache Sätze aus einer älteren Fassung als eigenen Zeitraum sichern,
-    // damit eine abweichende Einstellung nicht stillschweigend verlorengeht.
+    // Flache Sätze aus einer älteren Fassung als eigenen Zeitraum sichern.
     if(s&&(s.rateFoto!=null||s.rateAusschank!=null)){
-      var letzte=sz[sz.length-1];
-      var f=Number(s.rateFoto), a=Number(s.rateAusschank);
+      var letzte=sz[sz.length-1], f=Number(s.rateFoto), a=Number(s.rateAusschank);
       if((f&&f!==letzte.foto)||(a&&a!==letzte.ausschank)){
         sz.push({ab:curMk(), foto:f||letzte.foto, ausschank:a||letzte.ausschank});
       }
@@ -153,10 +170,8 @@ function adopt(d){
   entries=(d&&Array.isArray(d.entries)?d.entries:[]).map(normEntry);
   payments=(d&&Array.isArray(d.payments)?d.payments:[]);
   settings=normSettings(d&&d.settings);
-  if(d&&d.letztesBackup) settings.letztesBackup=d.letztesBackup;
 }
 
-/* Unverschlüsselte Daten einer früheren Fassung, falls vorhanden. */
 function legacyData(){
   var e=null,p=null,s=null;
   try{e=JSON.parse(localStorage.getItem(L_ENTRIES));}catch(x){}
@@ -200,15 +215,38 @@ function rateOf(e){
   var s=satzFor(e.date);
   return e.art==='ausschank' ? s.ausschank : s.foto;
 }
+/** Stornierte Aufträge zählen nirgends mit. */
+function zaehlt(e){ return !(e.area==='self' && e.status==='Storniert'); }
 function amountOf(e){
   if(e.area==='self') return e.billing==='fix' ? (Number(e.amount)||0) : paidHours(e)*rateOf(e);
   if(e.modus==='kilometer') return Math.max(0,(Number(e.km)||0)-(settings.kmFrei||0))*(settings.kmRate||0);
   return paidHours(e)*rateOf(e);
 }
+function anzOf(e){ return e.area==='self' ? Math.min(Number(e.anzahlung)||0, amountOf(e)) : 0; }
+function ausgOf(e){ return e.area==='self' ? (Number(e.ausgaben)||0) : 0; }
+function offenOf(e){
+  if(!zaehlt(e)||e.paid) return 0;
+  return Math.max(0, amountOf(e)-anzOf(e));
+}
 function kmOf(e){return e.modus==='kilometer'?(Number(e.km)||0):0;}
 function fotosPerH(e){var h=paidHours(e);return (e.fotos&&h)?(Number(e.fotos)/h):null;}
 function modusLabel(e){return e.modus==='fahrzeit'?'Fahrzeit':e.modus==='kilometer'?'Kilometer':'regulär';}
 function artLabel(e){return e.art==='ausschank'?'Ausschank':'Fotografisch';}
+/* Voll angezahlt heißt: es steht nichts mehr offen – also „Bezahlt“. */
+function vollBezahlt(e){ return e.paid || (amountOf(e)>0 && offenOf(e)<=0.005); }
+function zahlStatus(e){ return vollBezahlt(e)?'Bezahlt':(anzOf(e)>0?'Teilzahlung':'Offen'); }
+function zahlDot(e){ return vollBezahlt(e)?'dot-good':(anzOf(e)>0?'dot-gold':'dot-red'); }
+
+function summe(l){
+  var rel=l.filter(zaehlt);
+  var betrag=add(rel.map(amountOf)), ausgaben=add(rel.map(ausgOf));
+  return {
+    n:l.length, nRel:rel.length, storno:l.length-rel.length,
+    zeit:add(rel.map(rawHours)), bez:add(rel.map(paidHours)), km:add(rel.map(kmOf)),
+    betrag:betrag, anzahlung:add(rel.map(anzOf)), ausgaben:ausgaben,
+    offen:add(rel.map(offenOf)), ergebnis:betrag-ausgaben
+  };
+}
 
 /* ============ selektoren ============ */
 
@@ -219,33 +257,28 @@ function sortEntries(l){return l.slice().sort(function(x,y){
   return x.date.localeCompare(y.date)||String(x.start||'').localeCompare(String(y.start||''));});}
 function monthEntries(a,m){return sortEntries(areaEntries(a).filter(function(e){return mk(e.date)===m;}));}
 function yearEntries(a,y){return sortEntries(areaEntries(a).filter(function(e){return e.date.slice(0,4)===y;}));}
-function monthKeys(a){
-  var s={}; areaEntries(a).forEach(function(e){s[mk(e.date)]=1;}); s[curMk()]=1;
-  return Object.keys(s).sort().reverse();
-}
 function jahre(a){
   var s={}; areaEntries(a).forEach(function(e){s[e.date.slice(0,4)]=1;});
-  s[String(new Date().getFullYear())]=1;
+  s[curY()]=1;
   return Object.keys(s).sort().reverse();
 }
-function last6(a){
-  var out=[],now=new Date();
-  for(var i=5;i>=0;i--){var d=new Date(now.getFullYear(),now.getMonth()-i,1);out.push(d.getFullYear()+'-'+p2(d.getMonth()+1));}
-  return out;
-}
 function payFor(a,m){return payments.filter(function(p){return p.area===a&&p.month===m;});}
-function areaName(a){return a==='martin'?'Martin':'Selbstständig';}
-function areaKind(a){return a==='martin'?'Unselbständige Anstellung':'Eigene Aufträge';}
+function areaName(a){return a==='martin'?'Martin':'Aufträge';}
+function areaKind(a){return a==='martin'?'Arbeitszeit · unselbständig':'Eigene Aufträge & Honorare';}
 
-function summe(l){
-  return {
-    n:l.length,
-    zeit:add(l.map(rawHours)),
-    bez:add(l.map(paidHours)),
-    km:add(l.map(kmOf)),
-    betrag:add(l.map(amountOf)),
-    offen:add(l.filter(function(e){return !e.paid;}).map(amountOf))
-  };
+function sucheAktiv(){ return !!(ui.suche.trim()||ui.fArt||ui.fStatus); }
+function treffer(a){
+  var q=ui.suche.trim().toLowerCase();
+  return sortEntries(areaEntries(a).filter(function(e){
+    if(ui.fArt && e.art!==ui.fArt) return false;
+    if(ui.fStatus && e.status!==ui.fStatus) return false;
+    if(q){
+      var hay=[e.client,e.name,e.was,e.ort,e.notiz,e.rechnung,e.telefon,e.email,e.art,e.status]
+        .filter(Boolean).join(' ').toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  })).reverse();
 }
 
 /* ============ diagramme ============ */
@@ -267,7 +300,14 @@ function rowPath(x,y,w,h,r){
 }
 function leer(t){return '<p class="chart-empty">'+esc(t||'Für diesen Zeitraum liegen keine Werte vor.')+'</p>';}
 
-/* Säulen, eine Serie. items:[{label,value,tip}] */
+/* Diagrammbreite an den Container koppeln, damit die Beschriftung beim
+   Skalieren ihre echte Größe behält. .wrap ist höchstens 560 breit,
+   davon je 20 px Rand und 15 px Innenabstand der Karte. */
+function chartW(){
+  return Math.max(280, Math.min(560, window.innerWidth||560) - 70);
+}
+function nStk(n,ein,mehr){ return n+' '+(n===1?ein:mehr); }
+
 function columnChart(items,o){
   o=o||{};
   if(!items.length||!items.some(function(i){return i.value;})) return leer(o.empty);
@@ -286,14 +326,13 @@ function columnChart(items,o){
   var step=Math.max(1,Math.ceil(lw/band));
   var b=items.map(function(it,i){
     var cx=pl+i*band+band/2, h=it.value>0?Math.max(2,ph-(y(it.value)-pt)):0;
-    return (h>0?'<path d="'+colPath(cx-bw/2,y(it.value),bw,h,3)+'" fill="'+(o.color||'var(--accent)')+'"><title>'
-        +esc(it.tip||(it.label+': '+eur(it.value)))+'</title></path>':'')
+    return (h>0?'<path d="'+colPath(cx-bw/2,y(it.value),bw,h,3)+'" fill="'+(o.color||'var(--accent)')+'"'
+        +(it.dim?' opacity=".42"':'')+'><title>'+esc(it.tip||(it.label+': '+eur(it.value)))+'</title></path>':'')
       +(i%step===0?'<text x="'+cx.toFixed(1)+'" y="'+(H-9)+'" text-anchor="middle" font-size="9.5" fill="#9A938A">'+esc(it.label)+'</text>':'');
   }).join('');
   return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(o.aria||'Säulendiagramm')+'">'+g+b+'</svg>';
 }
 
-/* Liegende Balken mit direktem Wertlabel – die Beschriftung trägt die Identität. */
 function rowChart(items,o){
   o=o||{};
   var rows=items.filter(function(i){return i.value>0;}).sort(function(a,b){return b.value-a.value;});
@@ -317,33 +356,63 @@ function rowChart(items,o){
   return '<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="'+esc(o.aria||'Balkendiagramm')+'">'+body+'</svg>';
 }
 
-/* ============ aktionen ============ */
+/* ============ navigation ============ */
 
-function go(view,a){ui.view=view;if(a){ui.area=a;ui.month=curMk();}render();}
-function setMonth(m){ui.month=m;render();}
+function go(view,a){
+  ui.view=view;
+  if(a){ ui.area=a; ui.month=curMk(); ui.jahr=curY(); ui.modus='monat'; ui.suche=''; ui.fArt=''; ui.fStatus=''; ui.sucheAn=false; }
+  render();
+}
+function setMonth(m){ ui.month=m; ui.jahr=m.slice(0,4); ui.modus='monat'; render(); }
+function setJahr(y){ ui.jahr=y; ui.month=y+'-'+ui.month.slice(5); render(); }
+function setModus(m){ ui.modus=m; render(); }
+function zuMonat(m){ ui.month=m; ui.jahr=m.slice(0,4); ui.modus='monat'; render(); }
+function toggleSuche(){
+  ui.sucheAn=!ui.sucheAn;
+  if(!ui.sucheAn){ ui.suche=''; ui.fArt=''; ui.fStatus=''; }
+  render();
+  if(ui.sucheAn){ var el=document.getElementById('q'); if(el) el.focus(); }
+}
+/* Nur die Liste neu zeichnen – so bleibt der Cursor im Suchfeld stehen. */
+function onSuche(el){
+  ui.suche=el.value;
+  var box=document.getElementById('ledgerbox');
+  if(box) box.innerHTML=ledgerHTML();
+}
+function onFilter(){
+  ui.fArt=v('fq-art'); ui.fStatus=v('fq-status');
+  var box=document.getElementById('ledgerbox');
+  if(box) box.innerHTML=ledgerHTML();
+}
 function closeSheet(){ui.sheet=null;ui.editId=null;ui.errs={};render();}
 
+/* ============ eintrag anlegen / bearbeiten ============ */
+
+var editId=null;
 function openForm(id){
   ui.editId=id||null;ui.errs={};
   if(id){
     var e=entries.find(function(x){return x.id===id;});
     if(!e)return;
-    ui.fArea=e.area;ui.fArt=e.art||'fotografisch';ui.fModus=e.modus||'regulaer';
+    ui.fArea=e.area;ui.fArt2=e.area==='martin'?(e.art||'fotografisch'):'fotografisch';
+    ui.fModus=e.modus||'regulaer';
     ui.fTime=e.timeMode||'duration';ui.fBilling=e.billing||'fix';
     ui.draft={};
   }else{
-    ui.fArea=ui.area;ui.fArt='fotografisch';ui.fModus='regulaer';ui.fTime='range';ui.fBilling='fix';
-    ui.draft={date:today()};
+    ui.fArea=ui.area;ui.fArt2='fotografisch';ui.fModus='regulaer';
+    ui.fTime=ui.area==='self'?'duration':'range';ui.fBilling='fix';
+    ui.draft={date: ui.month===curMk()? today() : ui.month+'-01'};
   }
   ui.sheet='form';render();
 }
 function keepDraft(){
-  ['f-date','f-start','f-end','f-dh','f-dm','f-km','f-was','f-name','f-fotos','f-notiz','f-client','f-amount','f-rate']
+  ['f-date','f-start','f-end','f-dh','f-dm','f-km','f-was','f-name','f-fotos','f-notiz',
+   'f-client','f-amount','f-rate','f-ort','f-tel','f-mail','f-anz','f-ausg','f-rech','f-status','f-kunstart']
     .forEach(function(id){var el=document.getElementById(id);if(el)ui.draft[id.slice(2)]=el.value;});
 }
 function setArea(x){keepDraft();ui.fArea=x;ui.fTime=x==='self'?'duration':ui.fTime;render();}
-function setArt(x){keepDraft();ui.fArt=x;render();}
-function setModus(x){keepDraft();ui.fModus=x;render();}
+function setArt(x){keepDraft();ui.fArt2=x;render();}
+function setModus2(x){keepDraft();ui.fModus=x;render();}
 function setTimeMode(x){keepDraft();ui.fTime=x;render();}
 function setBilling(x){keepDraft();ui.fBilling=x;render();}
 
@@ -357,42 +426,48 @@ function saveForm(){
   e.timeMode=ui.fTime;
   if(ui.fTime==='range'){e.start=v('f-start');e.end=v('f-end');}
   else {e.durH=num(v('f-dh'));e.durM=num(v('f-dm'));}
+  var hatZeit = ui.fTime==='range' ? !!(v('f-start')&&v('f-end')) : !!(num(v('f-dh'))||num(v('f-dm')));
 
   if(ui.fArea==='martin'){
-    e.art=ui.fArt; e.modus=ui.fModus;
+    e.art=ui.fArt2; e.modus=ui.fModus;
     e.was=v('f-was').trim(); e.name=v('f-name').trim();
     if(ui.fModus==='kilometer'){
       e.km=num(v('f-km'));
       if(!e.km) errs.km='Kilometer fehlen';
       e.timeMode='duration';e.durH=0;e.durM=0;
     }else{
-      if(ui.fTime==='range'){ if(!e.start||!e.end) errs.time='Beginn und Ende angeben'; }
-      else if(!num(v('f-dh'))&&!num(v('f-dm'))) errs.time='Dauer fehlt';
+      if(!hatZeit) errs.time=ui.fTime==='range'?'Beginn und Ende angeben':'Dauer fehlt';
       if(v('f-fotos')) e.fotos=num(v('f-fotos'));
     }
   }else{
-    e.client=v('f-client').trim(); e.was=v('f-was').trim(); e.billing=ui.fBilling;
+    e.client=v('f-client').trim();
+    e.art=v('f-kunstart')||'Sonstiges';
+    e.status=v('f-status')||'Bestätigt';
+    e.ort=v('f-ort').trim(); e.telefon=v('f-tel').trim(); e.email=v('f-mail').trim();
+    e.was=v('f-was').trim(); e.rechnung=v('f-rech').trim();
+    e.anzahlung=num(v('f-anz')); e.ausgaben=num(v('f-ausg'));
+    e.billing=ui.fBilling;
     if(!e.client) errs.client='Kunde fehlt';
     if(ui.fBilling==='fix'){
       e.amount=num(v('f-amount'));
-      if(!e.amount) errs.amount='Betrag fehlt';
+      if(!e.amount) errs.amount='Honorar fehlt';
     }else{
       e.rate=num(v('f-rate'))||settings.rateSelf;
       if(!e.rate) errs.rate='Stundensatz fehlt';
+      // Zeit nur nötig, wenn nach Stunden abgerechnet wird
+      if(!hatZeit) errs.time=ui.fTime==='range'?'Beginn und Ende angeben':'Dauer fehlt';
     }
-    if(ui.fTime==='range'){ if(!e.start||!e.end) errs.time='Beginn und Ende angeben'; }
-    else if(!num(v('f-dh'))&&!num(v('f-dm'))) errs.time='Dauer fehlt';
+    if(v('f-fotos')) e.fotos=num(v('f-fotos'));
   }
 
   if(Object.keys(errs).length){ui.errs=errs;keepDraft();render();return;}
   e=normEntry(e);
   if(ui.editId) entries=entries.map(function(x){return x.id===ui.editId?e:x;});
   else entries.push(e);
-  ui.month=mk(e.date); ui.area=e.area;
+  ui.area=e.area; ui.month=mk(e.date); ui.jahr=e.date.slice(0,4); ui.modus='monat';
   ui.sheet=null;ui.editId=null;ui.errs={};render();save();
 }
 
-/* Einträge werden nie hart gelöscht – sie wandern in den Papierkorb. */
 function trashEntry(){
   if(!ui.editId)return;
   var e=entries.find(function(x){return x.id===ui.editId;});
@@ -414,17 +489,19 @@ function purgeEntry(id){
   render(); save();
 }
 
+/* ============ abrechnen ============ */
+
 function openSettle(scopeId){ui.settleScope=scopeId||null;ui.sheet='settle';ui.errs={};render();}
 function settleTargets(){
   if(ui.settleScope){
     var e=entries.find(function(x){return x.id===ui.settleScope;});
     return e?[e]:[];
   }
-  return monthEntries(ui.area,ui.month).filter(function(e){return !e.paid;});
+  return monthEntries(ui.area,ui.month).filter(function(e){return !e.paid&&zaehlt(e);});
 }
 function doSettle(){
   var t=settleTargets(); if(!t.length){closeSheet();return;}
-  var soll=add(t.map(amountOf));
+  var soll=add(t.map(offenOf));
   var got=v('s-amount')===''?soll:num(v('s-amount'));
   var rec={id:uid(),area:ui.area,month:ui.month,date:v('s-date')||today(),
            soll:soll,got:got,method:v('s-method'),note:v('s-note').trim(),
@@ -441,13 +518,12 @@ function unpay(id,ev){
   if(ev)ev.stopPropagation();
   var e=entries.find(function(x){return x.id===id;});
   if(!e)return;
-  if(e.paid){
-    e.paid=false; e.payment=null; e.bearbeitet=nowISO();
-    render(); save();
-  }else openSettle(id);
+  if(e.paid){ e.paid=false; e.payment=null; e.bearbeitet=nowISO(); render(); save(); }
+  else openSettle(id);
 }
 
-/* ---- sätze & einstellungen ---- */
+/* ============ sätze & einstellungen ============ */
+
 function openSettings(){ui.sheet='settings';render();}
 function readSaetze(){
   var out=[], list=settings.saetze||[];
@@ -479,13 +555,15 @@ function saveSettingsForm(){
   ui.sheet=null;render();save();
 }
 
-/* ---- sicherung ---- */
+/* ============ sicherung ============ */
+
 function openBackup(){ui.sheet='backup';render();}
 function openRestore(){ui.sheet='restore';render();}
 function openTrash(){ui.sheet='trash';render();}
+function pickFile(){var i=document.getElementById('fileimp');if(i)i.click();}
 
 function backupObjekt(){
-  return {format:'auftragsbuch-arbeitszeit',schema:3,exportiert:nowISO(),
+  return {format:'auftragsbuch',schema:4,exportiert:nowISO(),
           entries:entries,payments:payments,settings:settings};
 }
 function exportJSON(){
@@ -503,38 +581,36 @@ function copyBackup(){
   }catch(x){}
 }
 function exportCSV(){
-  var head=['Bereich','Art','Fahrzeit / regulär','Datum','Beginn','Ende','Zeit','gefahrene KM',
-            'bezahlte Zeit','Satz','Betrag','Was','Name Hochzeitspaar','Kommentar','Bezahlt'];
+  var head=['Bereich','Datum','Kunde / Name','Auftragsart','Ort','Was','Fahrzeit / regulär',
+            'Beginn','Ende','Zeit','gefahrene KM','bezahlte Zeit','Satz','Honorar',
+            'Anzahlung','Ausgaben','Offen','Auftragsstatus','Zahlung','Rechnungsnr','Kommentar'];
   var q=function(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';};
   var rows=sortEntries(alive()).map(function(e){
-    return [areaName(e.area), e.area==='martin'?artLabel(e):(e.billing==='hourly'?'Stundensatz':'Festbetrag'),
-      e.area==='martin'?modusLabel(e):'', dLang(e.date), e.start||'', e.end||'',
-      hm(rawHours(e)), kmOf(e)||'', dec2(paidHours(e)).replace('.',''),
-      rateOf(e)?dec2(rateOf(e)):'', dec2(amountOf(e)),
-      e.was||'', e.area==='martin'?(e.name||''):(e.client||''),
-      (e.notiz||'').replace(/\s*\n\s*/g,' '), e.paid?'ja':'nein'].map(q).join(';');
+    var self=e.area==='self';
+    return [self?'Aufträge':'Martin', dLang(e.date), self?e.client:(e.name||''),
+      self?e.art:artLabel(e), self?e.ort:'', e.was||'', self?'':modusLabel(e),
+      e.start||'', e.end||'', hm(rawHours(e)), kmOf(e)||'', dec2(paidHours(e)),
+      rateOf(e)?dec2(rateOf(e)):'', dec2(amountOf(e)), self?dec2(anzOf(e)):'',
+      self?dec2(ausgOf(e)):'', dec2(offenOf(e)), self?e.status:'', zahlStatus(e),
+      self?(e.rechnung||''):'', (e.notiz||'').replace(/\s*\n\s*/g,' ')].map(q).join(';');
   });
   download('Auftragsbuch-'+today()+'.csv','﻿'+[head.join(';')].concat(rows).join('\r\n'),'text/csv;charset=utf-8');
 }
 
-/* Zusammenführen statt ersetzen: vorhandene Einträge gehen dabei nie verloren. */
 function mergeDaten(d,quelle){
   var ein=(Array.isArray(d)?d:(d.entries||[])).map(normEntry);
   var vorh={}; entries.forEach(function(e){vorh[e.id]=e;});
   var neu=0, akt=0;
   ein.forEach(function(e){
     var a=vorh[e.id];
-    if(!a) neu++;
-    else if(e.bearbeitet>a.bearbeitet) akt++;
+    if(!a) neu++; else if(e.bearbeitet>a.bearbeitet) akt++;
   });
   if(!confirm('Sicherung'+(quelle?' aus '+quelle:'')+' mit '+ein.length+' Einträgen.\n\n'
     +'• '+neu+' kommen neu hinzu\n• '+akt+' werden aktualisiert\n• '+(ein.length-neu-akt)+' bleiben unverändert\n\n'
     +'Es wird nur ergänzt – bestehende Einträge gehen nicht verloren. Fortfahren?')) return false;
-
   ein.forEach(function(e){
     var a=vorh[e.id];
-    if(!a) entries.push(e);
-    else if(e.bearbeitet>a.bearbeitet) Object.assign(a,e);
+    if(!a) entries.push(e); else if(e.bearbeitet>a.bearbeitet) Object.assign(a,e);
   });
   if(!Array.isArray(d)){
     var pv={}; payments.forEach(function(p){pv[p.id]=1;});
@@ -547,8 +623,7 @@ function mergeDaten(d,quelle){
 }
 function applyRestore(){
   var ta=document.getElementById('rs'); if(!ta)return;
-  var er=document.getElementById('rserr');
-  var d;
+  var er=document.getElementById('rserr'), d;
   try{ d=JSON.parse(ta.value); }
   catch(x){ if(er) er.textContent='Das ist kein gültiges Sicherungsformat.'; return; }
   if(!mergeDaten(d,'der Zwischenablage')) return;
@@ -565,14 +640,14 @@ function importDatei(input){
   });
 }
 
-/* ---- alles löschen ---- */
+/* ============ alles löschen ============ */
+
 function openReset(){ui.sheet='reset';render();}
 function checkWipe(){
   var b=document.getElementById('wipego');
   if(b) b.disabled=!(document.getElementById('wipeack').checked && v('wipeword').trim()==='ALLES LÖSCHEN');
 }
 function doWipe(){
-  // Bewusst getrennte zweite Bestätigung
   if(!confirm('Letzte Sicherheitsfrage:\n\nAlle Einträge, Abrechnungen, der Papierkorb und das '
     +'Passwort werden jetzt endgültig von diesem Gerät entfernt. Fortfahren?')) return;
   [K_VAULT,K_META,L_ENTRIES,L_PAY,L_SET,L_LOCK,'ab_migrated'].forEach(function(k){localStorage.removeItem(k);});
@@ -580,37 +655,49 @@ function doWipe(){
   location.reload();
 }
 
-/* ============ live-vorschau im formular ============ */
+/* ============ live-vorschau ============ */
 
 function liveCalc(){
   var el=document.getElementById('calc'); if(!el)return;
-  var e={area:ui.fArea,art:ui.fArt,modus:ui.fModus,timeMode:ui.fTime,billing:ui.fBilling,
-         date:v('f-date')||today(),
+  var e={area:ui.fArea,art:ui.fArea==='martin'?ui.fArt2:v('f-kunstart'),modus:ui.fModus,
+         timeMode:ui.fTime,billing:ui.fBilling,date:v('f-date')||today(),
          start:v('f-start'),end:v('f-end'),durH:num(v('f-dh')),durM:num(v('f-dm')),
          km:num(v('f-km')),amount:num(v('f-amount')),rate:num(v('f-rate'))||settings.rateSelf,
+         anzahlung:num(v('f-anz')),ausgaben:num(v('f-ausg')),status:v('f-status'),
          fotos:num(v('f-fotos'))};
   var parts=[];
   if(ui.fArea==='martin'&&ui.fModus==='kilometer'){
     var frei=settings.kmFrei||0;
     parts.push('<b>'+eur(amountOf(e))+'</b>');
     parts.push(Math.max(0,e.km-frei)+' km abrechenbar (ab '+frei+' km)');
+  }else if(ui.fArea==='self'){
+    parts.push('Honorar <b>'+eur(amountOf(e))+'</b>'
+      +(ui.fBilling==='hourly'?' · '+hm(paidHours(e))+' Std × '+eur(rateOf(e)):''));
+    if(e.anzahlung) parts.push('Anzahlung '+eur(anzOf(e))+' · offen '+eur(offenOf(e)));
+    if(e.ausgaben) parts.push('Ergebnis '+eur(amountOf(e)-ausgOf(e))+' nach Ausgaben');
+    if(e.status==='Storniert') parts.push('storniert – zählt nicht mit');
   }else{
     parts.push('Zeit '+hm(rawHours(e))+' · bezahlt '+hm(paidHours(e))+' Std');
     var r=rateOf(e);
-    parts.push('<b>'+eur(amountOf(e))+'</b>'+((ui.fArea==='martin'||ui.fBilling==='hourly')&&r?' bei '+eur(r)+'/Std':''));
-    if(ui.fArea==='martin'&&r) parts.push('Satz gültig ab '+mLong(satzFor(e.date).ab));
+    parts.push('<b>'+eur(amountOf(e))+'</b>'+(r?' bei '+eur(r)+'/Std':''));
+    if(r) parts.push('Satz gültig ab '+mLong(satzFor(e.date).ab));
     var fp=fotosPerH(e); if(fp) parts.push(Math.round(fp)+' Fotos pro Stunde');
   }
   el.innerHTML=parts.join(' &middot; ');
 }
 
-/* ============ ansichten ============ */
+/* ============ symbol ============ */
 
 function cameraSVG(){
-  return '<svg viewBox="0 0 32 26" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">'
-  +'<path d="M2 8.5a2 2 0 012-2h4l2.2-3.2A1.6 1.6 0 0111.5 2.6h9a1.6 1.6 0 011.3.7L24 6.5h4a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2z"/>'
-  +'<circle cx="16" cy="14" r="5.2"/><circle cx="16" cy="14" r="1.9"/></svg>';
+  return '<svg viewBox="0 0 32 26" aria-hidden="true">'
+  +'<path d="M2 8.5a2 2 0 012-2h4l2.2-3.2A1.6 1.6 0 0111.5 2.6h9a1.6 1.6 0 011.3.7L24 6.5h4a2 2 0 012 2v12a2 2 0 01-2 2H4a2 2 0 01-2-2z" '
+  +'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>'
+  +'<path d="M16 19.6c0 0-5.9-3.9-5.9-7.4 0-1.8 1.4-3.1 3-3.1 1.2 0 2.3.7 2.9 1.8.6-1.1 1.7-1.8 2.9-1.8 1.6 0 3 1.3 3 3.1 0 3.5-5.9 7.4-5.9 7.4z" '
+  +'fill="currentColor"/>'
+  +'<circle cx="26" cy="11" r="1" fill="currentColor" opacity=".55"/></svg>';
 }
+
+/* ============ startseite ============ */
 
 function banners(){
   var h='';
@@ -630,11 +717,11 @@ function banners(){
 function viewHome(){
   var h='<div class="wrap"><div class="masthead">'
     +'<div class="mark">'+cameraSVG()+'<span class="mark-title">Auftragsbuch</span></div>'
-    +'<div class="mark-rule"></div><div class="mark-sub">Arbeitszeit &amp; Honorar</div></div>';
+    +'<div class="mark-rule"></div><div class="mark-sub">Aufträge &amp; Arbeitszeit</div></div>';
   h+=banners();
-  h+=['martin','self'].map(homeCard).join('');
+  h+=['self','martin'].map(homeCard).join('');
   h+=noteStream();
-  h+='<div style="text-align:center;margin-top:30px;display:flex;gap:16px;justify-content:center;flex-wrap:wrap">'
+  h+='<div class="homelinks">'
     +'<button class="linkbtn" onclick="A.openReport()">Bericht &amp; PDF</button>'
     +'<button class="linkbtn" onclick="A.openSettings()">Sätze &amp; Einstellungen</button>'
     +'<button class="linkbtn" onclick="A.openBackup()">Sicherung</button>'
@@ -643,72 +730,191 @@ function viewHome(){
   return h;
 }
 function homeCard(a){
-  var m=curMk(), es=monthEntries(a,m);
-  var open=areaEntries(a).filter(function(e){return !e.paid;});
+  var m=curMk(), y=curY();
+  var sM=summe(monthEntries(a,m)), sJ=summe(yearEntries(a,y));
   var c=a==='martin'?'var(--martin)':'var(--self)';
+  var zeile=function(k,s){
+    return '<div class="area-stats"><div class="area-per">'+esc(k)+'</div>'
+      + (a==='martin'
+        ? '<div><div class="stat-k">Stunden</div><div class="stat-v num">'+hm(s.bez)+'</div></div>'
+          +'<div><div class="stat-k">Betrag</div><div class="stat-v num">'+eur0(s.betrag)+'</div></div>'
+        : '<div><div class="stat-k">Aufträge</div><div class="stat-v num">'+s.nRel+'</div></div>'
+          +'<div><div class="stat-k">Honorar</div><div class="stat-v num">'+eur0(s.betrag)+'</div></div>')
+      +'<div><div class="stat-k">Offen</div><div class="stat-v num" style="color:'+(s.offen?'var(--red)':'var(--ink-3)')+'">'+eur0(s.offen)+'</div></div>'
+      +'</div>';
+  };
   return '<button class="area-card" style="--c:'+c+'" onclick="A.go(\'area\',\''+a+'\')">'
     +'<span class="chev">›</span>'
     +'<div class="area-name">'+areaName(a)+'</div><div class="area-kind">'+areaKind(a)+'</div>'
-    +'<div class="area-stats">'
-    +'<div><div class="stat-k">'+mMini(m)+' Stunden</div><div class="stat-v num">'+hm(add(es.map(paidHours)))+'</div></div>'
-    +'<div><div class="stat-k">'+mMini(m)+' Betrag</div><div class="stat-v num">'+eur(add(es.map(amountOf)))+'</div></div>'
-    +'<div><div class="stat-k">Offen</div><div class="stat-v num" style="color:'+(open.length?'var(--red)':'var(--ink-3)')+'">'+eur(add(open.map(amountOf)))+'</div></div>'
-    +'</div></button>';
+    +zeile(mMini(m)+' '+String(y).slice(2), sM)
+    +zeile('Jahr '+y, sJ)
+    +'</button>';
 }
 function noteStream(){
   var ns=alive().filter(function(e){return e.notiz;})
-    .sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,6);
+    .sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,5);
   if(!ns.length) return '';
   return '<div class="sec"><div class="sec-head"><span class="label">Notizen</span></div>'
     + ns.map(function(e){
         var c=e.area==='martin'?'var(--martin)':'var(--self)';
         return '<div class="note" onclick="A.go(\'area\',\''+e.area+'\');A.setMonth(\''+mk(e.date)+'\')">'
-          +'<div class="note-top"><span class="note-src" style="color:'+c+'">'+esc(e.area==='martin'?(e.name||'Martin'):(e.client||'Selbstständig'))+'</span>'
+          +'<div class="note-top"><span class="note-src" style="color:'+c+'">'
+          +esc(e.area==='martin'?(e.name||'Martin'):(e.client||'Auftrag'))+'</span>'
           +'<span class="note-date num">'+dShort(e.date)+'</span></div>'
           +'<div class="note-body">'+esc(e.notiz)+'</div></div>';
       }).join('') + '</div>';
 }
 
+/* ============ bereichsansicht ============ */
+
 function viewArea(){
-  var a=ui.area, m=ui.month||curMk(), es=monthEntries(a,m), keys=monthKeys(a);
+  var a=ui.area;
+  if(!ui.jahr) ui.jahr=ui.month.slice(0,4);
+  var js=jahre(a);
+  if(js.indexOf(ui.jahr)<0) js=js.concat([ui.jahr]).sort().reverse();
+
   var h='<div class="topbar"><div class="topbar-inner"><div class="topbar-row">'
     +'<button class="back" onclick="A.go(\'home\')">‹</button>'
     +'<span class="topbar-title">'+areaName(a)+'</span>'
+    +'<button class="iconbtn'+(ui.sucheAn?' on':'')+'" title="Suchen" onclick="A.toggleSuche()">⌕</button>'
     +'<button class="iconbtn" title="Bericht" onclick="A.openReport()">▤</button>'
-    +'<button class="iconbtn" title="Einstellungen" onclick="A.openSettings()">⚙</button></div>'
-    +'<div class="months">'+keys.map(function(k){
-        return '<button class="mtab '+(k===m?'on':'')+'" onclick="A.setMonth(\''+k+'\')">'+mShort(k)+'</button>';
-      }).join('')+'</div></div></div><div class="wrap">';
+    +'<button class="iconbtn" title="Einstellungen" onclick="A.openSettings()">⚙</button></div>';
 
+  if(ui.sucheAn){
+    h+='<div class="searchrow"><input id="q" type="search" placeholder="Kunde, Ort, Notiz, Rechnungsnr. …" '
+      +'value="'+esc(ui.suche)+'" oninput="A.onSuche(this)">';
+    if(a==='self'){
+      h+='<div class="two" style="margin-top:8px">'
+        +'<select id="fq-art" onchange="A.onFilter()"><option value="">Alle Arten</option>'
+        +ARTEN.map(function(x){return '<option'+(ui.fArt===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select>'
+        +'<select id="fq-status" onchange="A.onFilter()"><option value="">Alle Status</option>'
+        +STATUS.map(function(x){return '<option'+(ui.fStatus===x?' selected':'')+'>'+x+'</option>';}).join('')+'</select></div>';
+    }
+    h+='</div>';
+  }
+
+  if(!sucheAktiv()){
+    h+='<div class="seg seg-sm">'
+      +'<button class="'+(ui.modus==='monat'?'on':'')+'" onclick="A.setModus(\'monat\')">Monat</button>'
+      +'<button class="'+(ui.modus==='jahr'?'on':'')+'" onclick="A.setModus(\'jahr\')">Jahr</button></div>';
+    h+='<div class="chips">'+js.map(function(y){
+        return '<button class="chip '+(y===ui.jahr?'on':'')+'" onclick="A.setJahr(\''+y+'\')">'+y+'</button>';
+      }).join('')+'</div>';
+    if(ui.modus==='monat'){
+      h+='<div class="chips">'+[0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
+          var key=ui.jahr+'-'+p2(i+1), n=monthEntries(a,key).length;
+          return '<button class="chip mini '+(key===ui.month?'on':'')+(n?' has':'')+'" onclick="A.zuMonat(\''+key+'\')">'
+            +mMini(key)+(n?'<i>'+n+'</i>':'')+'</button>';
+        }).join('')+'</div>';
+    }
+  }
+  h+='</div></div><div class="wrap">';
   h+=banners();
+  h+='<div id="ledgerbox">'+ledgerHTML()+'</div>';
+  h+='</div><button class="fab" onclick="A.openForm()">+ '+(a==='self'?'Auftrag':'Eintrag')+'</button>';
+  return h;
+}
 
+/* Alles unterhalb der Kopfzeile – wird beim Tippen einzeln neu gezeichnet. */
+function ledgerHTML(){
+  var a=ui.area;
+  if(sucheAktiv()) return trefferHTML(a);
+  return ui.modus==='jahr' ? jahrHTML(a) : monatHTML(a);
+}
+
+function trefferHTML(a){
+  var l=treffer(a), s=summe(l);
+  if(!l.length) return '<div class="ledger"><div class="empty">Nichts gefunden.</div></div>';
+  return '<div class="ledger"><div class="ledger-head"><span class="label">Treffer</span>'
+    +'<span class="label">'+l.length+' · '+eur(s.betrag)+'</span></div>'
+    +l.map(rowHTML).join('')+'</div>'
+    +'<p class="hint" style="margin-top:10px">Die Suche geht über alle Monate und Jahre dieses Bereichs.</p>';
+}
+
+function monatHTML(a){
+  var m=ui.month, es=monthEntries(a,m), h='';
   if(!es.length){
     h+='<div class="ledger"><div class="empty">Keine Einträge in '+mLong(m)+'.</div></div>';
   }else{
     h+='<div class="ledger"><div class="ledger-head"><span class="label">'+mLong(m)+'</span>'
-      +'<span class="label">'+es.length+' Einträge</span></div>';
-    h+=es.map(rowHTML).join('');
-    h+=sumbar(es)+'</div>';
+      +'<span class="label">'+nStk(es.length,a==='self'?'Auftrag':'Eintrag',a==='self'?'Aufträge':'Einträge')+'</span></div>'
+      +es.map(rowHTML).join('')+sumbar(a,es)+'</div>';
   }
-
-  var offen=es.filter(function(e){return !e.paid;});
-  if(offen.length) h+='<button class="settle-btn" onclick="A.openSettle()">Monat abrechnen · '+eur(add(offen.map(amountOf)))+'</button>';
+  var offen=es.filter(function(e){return !e.paid&&zaehlt(e);});
+  if(offen.length) h+='<button class="settle-btn" onclick="A.openSettle()">Monat abrechnen · '+eur(add(offen.map(offenOf)))+'</button>';
   payFor(a,m).filter(function(p){return !p.single;}).forEach(function(p){
     h+='<div class="settled"><div class="settled-t">Abgerechnet am '+dShort(p.date)+' · '+eur(p.got)+'</div>'
       +'<div class="settled-s">'+esc(p.method||'—')+' · '+p.count+' Einträge'
       +(Math.abs(p.got-p.soll)>0.005?' · Abweichung '+eur(p.got-p.soll)+' zu '+eur(p.soll):'')
       +(p.note?' · '+esc(p.note):'')+'</div></div>';
   });
-
-  h+=chartPanel(a);
-  h+='<div style="text-align:center;margin-top:22px"><button class="linkbtn" onclick="A.openReport()">'
-    +'Monatsbericht als PDF sichern</button></div>';
-  h+='</div><button class="fab" onclick="A.openForm()">+ Eintrag</button>';
+  h+=monatChart(a);
+  h+='<div class="ctr"><button class="linkbtn" onclick="A.openReport()">Monatsbericht als PDF sichern</button></div>';
   return h;
 }
 
+function jahrHTML(a){
+  var y=ui.jahr, es=yearEntries(a,y), s=summe(es);
+  var kacheln = a==='martin'
+    ? [['Einträge',String(s.n)],['Zeit',hm(s.zeit)+' Std'],['Bezahlte Zeit',hm(s.bez)+' Std'],
+       ['Gefahrene km',String(s.km)],['Betrag',eur(s.betrag)],['Offen',eur(s.offen)]]
+    : [['Aufträge',String(s.nRel)+(s.storno?' +'+s.storno+' storno':'')],['Honorar',eur(s.betrag)],
+       ['Anzahlungen',eur(s.anzahlung)],['Offen',eur(s.offen)],['Ausgaben',eur(s.ausgaben)],['Ergebnis',eur(s.ergebnis)]];
+
+  var h='<div class="ledger"><div class="ledger-head"><span class="label">Jahr '+y+'</span>'
+    +'<span class="label">'+nStk(s.n,a==='self'?'Auftrag':'Eintrag',a==='self'?'Aufträge':'Einträge')+'</span></div>'
+    +'<div class="ytiles">'+kacheln.map(function(k){
+      return '<div class="ytile"><div class="stat-k">'+esc(k[0])+'</div><div class="stat-v num">'+esc(k[1])+'</div></div>';
+    }).join('')+'</div>';
+
+  h+='<div class="ylist">'+[0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
+      var key=y+'-'+p2(i+1), le=monthEntries(a,key), sm=summe(le);
+      var sub = le.length
+        ? (a==='martin' ? nStk(le.length,'Eintrag','Einträge')+' · '+hm(sm.bez)+' Std'
+           : nStk(sm.nRel,'Auftrag','Aufträge')+(sm.storno?' +'+sm.storno+' storno':''))
+        : '—';
+      return '<div class="yrow'+(le.length?'':' leer')+'" onclick="A.zuMonat(\''+key+'\')">'
+        +'<span class="yrow-m">'+mName(i)+'</span>'
+        +'<span class="yrow-s">'+esc(sub)+'</span>'
+        +'<span class="yrow-a num">'+(le.length?eur(sm.betrag):'')+'</span>'
+        +'<span class="yrow-o num">'+(sm.offen?eur0(sm.offen)+' offen':'')+'</span></div>';
+    }).join('')+'</div></div>';
+
+  h+='<div class="panel"><div class="sec-head"><span class="label">'
+    +(a==='martin'?'Betrag pro Monat':'Honorar pro Monat')+' · '+y+'</span></div>'
+    +columnChart([0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
+        // Im Jahresüberblick zählen alle Monate gleich – kein Hervorheben.
+        var key=y+'-'+p2(i+1), sm=summe(monthEntries(a,key));
+        return {label:mMini(key),value:sm.betrag,tip:mLong(key)+': '+eur(sm.betrag)};
+      }),{width:chartW(),height:180,aria:'Betrag pro Monat'})+'</div>';
+
+  if(a==='self'){
+    var nachArt=ARTEN.map(function(x){
+      var g=es.filter(function(e){return e.art===x&&zaehlt(e);});
+      return {label:x,value:add(g.map(amountOf)),tip:nStk(g.length,'Auftrag','Aufträge')};
+    });
+    h+='<div class="panel"><div class="sec-head"><span class="label">Honorar nach Auftragsart · '+y+'</span></div>'
+      +rowChart(nachArt,{width:chartW(),aria:'Honorar nach Auftragsart'})+'</div>';
+  }
+  h+='<div class="ctr"><button class="linkbtn" onclick="A.openReport()">Jahresbericht als PDF sichern</button></div>';
+  return h;
+}
+
+function monatChart(a){
+  var data=[],now=new Date(ui.month+'-01T00:00:00');
+  for(var i=5;i>=0;i--){
+    var d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    var k=d.getFullYear()+'-'+p2(d.getMonth()+1);
+    data.push({label:mMini(k),value:summe(monthEntries(a,k)).betrag,dim:k!==ui.month,
+               tip:mLong(k)+': '+eur(summe(monthEntries(a,k)).betrag)});
+  }
+  if(!data.some(function(d){return d.value;})) return '';
+  return '<div class="panel"><div class="sec-head"><span class="label">Sechs Monate bis '+mShort(ui.month)+'</span></div>'
+    +columnChart(data,{width:chartW(),height:170,aria:'Betrag der letzten sechs Monate'})+'</div>';
+}
+
 function rowHTML(e){
-  var amt=amountOf(e), ph=paidHours(e), pillTxt, pillC, what, meta;
+  var amt=amountOf(e), ph=paidHours(e), pillTxt, pillC, what, meta, rechts;
   if(e.area==='martin'){
     pillTxt = e.modus==='fahrzeit'?'Fahrzeit':e.modus==='kilometer'?'KM':(e.art==='ausschank'?'Ausschank':'Foto');
     pillC = (e.modus==='kilometer'||e.modus==='fahrzeit') ? 'var(--gold)' : (e.art==='ausschank'?'var(--self)':'var(--martin)');
@@ -716,55 +922,48 @@ function rowHTML(e){
     meta = e.name||'';
     if(e.modus==='kilometer') meta=(meta?meta+' · ':'')+(e.km||0)+' km';
     if(e.fotos) meta=(meta?meta+' · ':'')+e.fotos+' Fotos';
+    rechts = dShort(e.date)+' · '+(e.modus==='kilometer' ? '—'
+      : (e.timeMode==='range'&&e.start&&e.end ? e.start+'–'+e.end+' · '+hm(ph) : hm(ph)+' Std'));
   }else{
-    pillTxt=e.billing==='hourly'?'Std':'Pauschal'; pillC='var(--self)';
-    what=e.client||'—'; meta=e.was||'';
+    pillTxt=e.art; pillC='var(--self)';
+    what=e.client||'—';
+    meta=[e.was,e.ort].filter(Boolean).join(' · ')||'—';
+    rechts = dShort(e.date)+(e.rechnung?' · Rg. '+e.rechnung:'');
   }
-  var timeTxt = e.modus==='kilometer' ? '—'
-    : (e.timeMode==='range'&&e.start&&e.end ? e.start+'–'+e.end+' · '+hm(ph) : hm(ph)+' Std');
-  return '<div class="row" onclick="A.openForm(\''+e.id+'\')">'
+  var storno = e.area==='self'&&e.status==='Storniert';
+  return '<div class="row'+(storno?' storno':'')+'" onclick="A.openForm(\''+e.id+'\')">'
     +'<button class="tick '+(e.paid?'on':'')+'" title="'+(e.paid?'Als offen markieren':'Abrechnen')+'" onclick="A.unpay(\''+e.id+'\',event)">'+(e.paid?'✓':'')+'</button>'
     +'<div class="row-body">'
-    +'<div class="row-l1"><span class="row-what"><span class="pill" style="background:'+pillC+';color:#fff">'+pillTxt+'</span>'+esc(what)+'</span>'
+    +'<div class="row-l1"><span class="row-what"><span class="pill" style="background:'+pillC+';color:#fff">'+esc(pillTxt)+'</span>'+esc(what)+'</span>'
     +'<span class="row-amt num">'+eur(amt)+'</span></div>'
-    +'<div class="row-l2"><span class="row-meta">'+esc(meta||'—')+'</span>'
-    +'<span class="row-time num">'+dShort(e.date)+' · '+timeTxt+'</span></div>'
+    +'<div class="row-l2"><span class="row-meta">'+esc(meta)+'</span>'
+    +'<span class="row-time num">'+esc(rechts)+'</span></div>'
+    +(e.area==='self'
+      ? '<div class="row-l2"><span class="badges">'
+        +'<span class="badge"><span class="dot '+STATUS_DOT[e.status]+'"></span>'+esc(e.status)+'</span>'
+        +(storno?'':'<span class="badge"><span class="dot '+zahlDot(e)+'"></span>'+zahlStatus(e)+'</span>')
+        +'</span>'
+        +'<span class="row-time num">'+(offenOf(e)?eur(offenOf(e))+' offen':'')+'</span></div>'
+      : '')
     +(e.notiz?'<div class="row-note">'+esc(e.notiz)+'</div>':'')
     +'</div></div>';
 }
 
-function sumbar(es){
+function sumbar(a,es){
   var s=summe(es);
+  var zellen = a==='martin'
+    ? [['Zeit',hm(s.zeit)],['Bezahlt',hm(s.bez)],['KM',String(s.km)],['Offen',eur(s.offen),s.offen?'var(--red)':'']]
+    : [['Aufträge',String(s.nRel)],['Anzahlung',eur0(s.anzahlung)],['Ausgaben',eur0(s.ausgaben)],['Offen',eur0(s.offen),s.offen?'var(--red)':'']];
   return '<div class="sumbar"><div class="sumgrid">'
-    +'<div class="sumcell"><div class="stat-k">Zeit</div><div class="stat-v num">'+hm(s.zeit)+'</div></div>'
-    +'<div class="sumcell"><div class="stat-k">Bezahlt</div><div class="stat-v num">'+hm(s.bez)+'</div></div>'
-    +'<div class="sumcell"><div class="stat-k">KM</div><div class="stat-v num">'+s.km+'</div></div>'
-    +'<div class="sumcell"><div class="stat-k">Offen</div><div class="stat-v num" style="color:'+(s.offen?'var(--red)':'var(--ink-3)')+'">'+eur(s.offen)+'</div></div>'
-    +'</div><div class="total-row"><span class="label">Summe</span><span class="total-v num">'+eur(s.betrag)+'</span></div></div>';
-}
-
-function chartPanel(a){
-  var data=last6(a).map(function(k){
-    var es=monthEntries(a,k);
-    return {k:k,label:mMini(k),std:add(es.map(paidHours)),bet:add(es.map(amountOf))};
-  });
-  if(!data.some(function(d){return d.bet||d.std;})) return '';
-  return '<div class="panel"><div class="sec-head"><span class="label">Sechs Monate</span></div>'
-    +bars(data,'bet')+'<div style="height:10px"></div>'+bars(data,'std')+'</div>';
-}
-function bars(data,key){
-  var max=Math.max.apply(null,[1].concat(data.map(function(d){return d[key];})));
-  var w=320,h=86,gap=9,pb=18,pt=14;
-  var bw=(w-gap*(data.length-1))/data.length;
-  var col=key==='bet'?'var(--accent)':'var(--gold)';
-  var s=data.map(function(d,i){
-    var bh=(d[key]/max)*(h-pb-pt), x=i*(bw+gap), y=h-pb-bh;
-    var lab=key==='bet'?Math.round(d[key])+'€':hm(d[key]);
-    return '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+Math.max(bh,1.5).toFixed(1)+'" rx="3" fill="'+col+'" opacity="'+(d.k===ui.month?1:.42)+'"/>'
-      +(d[key]>0?'<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-4).toFixed(1)+'" text-anchor="middle" font-size="8.5" fill="#6E6862">'+lab+'</text>':'')
-      +'<text x="'+(x+bw/2).toFixed(1)+'" y="'+(h-5)+'" text-anchor="middle" font-size="9" fill="#9A938A">'+d.label+'</text>';
-  }).join('');
-  return '<svg viewBox="0 0 '+w+' '+h+'" style="width:100%;height:92px;overflow:visible">'+s+'</svg>';
+    +zellen.map(function(z){
+      return '<div class="sumcell"><div class="stat-k">'+esc(z[0])+'</div>'
+        +'<div class="stat-v num"'+(z[2]?' style="color:'+z[2]+'"':'')+'>'+esc(z[1])+'</div></div>';
+    }).join('')
+    +'</div><div class="total-row"><span class="label">'+(a==='self'?'Honorar':'Summe')+'</span>'
+    +'<span class="total-v num">'+eur(s.betrag)+'</span></div>'
+    +(a==='self'&&s.ausgaben?'<div class="total-row" style="margin-top:6px;padding-top:6px">'
+      +'<span class="label">Ergebnis nach Ausgaben</span><span class="stat-v num">'+eur(s.ergebnis)+'</span></div>':'')
+    +'</div>';
 }
 
 /* ============ blätter ============ */
@@ -775,6 +974,9 @@ function shell(title,body,actions){
     +'<button class="iconbtn" onclick="A.closeSheet()">✕</button></div>'
     +body+(actions||'')+'</div></div>';
 }
+function optionen(list,cur){
+  return list.map(function(x){return '<option'+(cur===x?' selected':'')+'>'+esc(x)+'</option>';}).join('');
+}
 
 function sheetForm(){
   var e=ui.editId?entries.find(function(x){return x.id===ui.editId;}):null;
@@ -783,8 +985,19 @@ function sheetForm(){
 
   if(!ui.editId){
     b+='<div class="seg">'
-      +'<button class="'+(ui.fArea==='martin'?'on':'')+'" onclick="A.setArea(\'martin\')">Martin</button>'
-      +'<button class="'+(ui.fArea==='self'?'on':'')+'" onclick="A.setArea(\'self\')">Selbstständig</button></div>';
+      +'<button class="'+(ui.fArea==='self'?'on':'')+'" onclick="A.setArea(\'self\')">Auftrag</button>'
+      +'<button class="'+(ui.fArea==='martin'?'on':'')+'" onclick="A.setArea(\'martin\')">Martin</button></div>';
+  }
+
+  if(ui.fArea==='self'){
+    var kunden=Array.from(new Set(areaEntries('self').map(function(x){return x.client;}).filter(Boolean)));
+    b+='<div class="f"><label>Kunde / Auftraggeber</label><input type="text" id="f-client" list="cl" value="'+esc(g('client','client'))+'" placeholder="Name">'
+      +'<datalist id="cl">'+kunden.map(function(c){return '<option value="'+esc(c)+'"></option>';}).join('')+'</datalist>'
+      +(errs.client?'<div class="err">'+errs.client+'</div>':'')+'</div>';
+    b+='<div class="two"><div class="f"><label>Auftragsart</label><select id="f-kunstart" onchange="A.liveCalc()">'
+      +optionen(ARTEN,g('kunstart','art','Hochzeit'))+'</select></div>'
+      +'<div class="f"><label>Auftragsstatus</label><select id="f-status" onchange="A.liveCalc()">'
+      +optionen(STATUS,g('status','status','Bestätigt'))+'</select></div></div>';
   }
 
   b+='<div class="f"><label>Datum</label><input type="date" id="f-date" value="'+g('date','date',today())+'" oninput="A.liveCalc()">'
@@ -792,19 +1005,20 @@ function sheetForm(){
 
   if(ui.fArea==='martin'){
     b+='<div class="f"><label>Art</label><div class="seg" style="margin-bottom:0">'
-      +'<button class="'+(ui.fArt==='fotografisch'?'on':'')+'" onclick="A.setArt(\'fotografisch\')">Fotografisch</button>'
-      +'<button class="'+(ui.fArt==='ausschank'?'on':'')+'" onclick="A.setArt(\'ausschank\')">Ausschank</button></div></div>';
+      +'<button class="'+(ui.fArt2==='fotografisch'?'on':'')+'" onclick="A.setArt(\'fotografisch\')">Fotografisch</button>'
+      +'<button class="'+(ui.fArt2==='ausschank'?'on':'')+'" onclick="A.setArt(\'ausschank\')">Ausschank</button></div></div>';
     b+='<div class="f"><label>Zeile</label><div class="seg" style="margin-bottom:0">'
-      +'<button class="'+(ui.fModus==='regulaer'?'on':'')+'" onclick="A.setModus(\'regulaer\')">Regulär</button>'
-      +'<button class="'+(ui.fModus==='fahrzeit'?'on':'')+'" onclick="A.setModus(\'fahrzeit\')">Fahrzeit</button>'
-      +'<button class="'+(ui.fModus==='kilometer'?'on':'')+'" onclick="A.setModus(\'kilometer\')">Kilometer</button></div></div>';
+      +'<button class="'+(ui.fModus==='regulaer'?'on':'')+'" onclick="A.setModus2(\'regulaer\')">Regulär</button>'
+      +'<button class="'+(ui.fModus==='fahrzeit'?'on':'')+'" onclick="A.setModus2(\'fahrzeit\')">Fahrzeit</button>'
+      +'<button class="'+(ui.fModus==='kilometer'?'on':'')+'" onclick="A.setModus2(\'kilometer\')">Kilometer</button></div></div>';
   }
 
   if(ui.fArea==='martin'&&ui.fModus==='kilometer'){
     b+='<div class="f"><label>Gefahrene Kilometer</label><input type="number" inputmode="numeric" min="0" id="f-km" value="'+g('km','km')+'" oninput="A.liveCalc()" placeholder="0">'
       +(errs.km?'<div class="err">'+errs.km+'</div>':'')+'</div>';
   }else{
-    b+='<div class="f"><label>Zeit</label><div class="seg" style="margin-bottom:9px">'
+    b+='<div class="f"><label>Zeit'+(ui.fArea==='self'&&ui.fBilling==='fix'?' (optional)':'')+'</label>'
+      +'<div class="seg" style="margin-bottom:9px">'
       +'<button class="'+(ui.fTime==='range'?'on':'')+'" onclick="A.setTimeMode(\'range\')">Beginn / Ende</button>'
       +'<button class="'+(ui.fTime==='duration'?'on':'')+'" onclick="A.setTimeMode(\'duration\')">Dauer</button></div>';
     if(ui.fTime==='range'){
@@ -829,35 +1043,40 @@ function sheetForm(){
       b+='<div class="f"><label>Anzahl Fotos (optional)</label><input type="number" inputmode="numeric" min="0" id="f-fotos" value="'+g('fotos','fotos')+'" oninput="A.liveCalc()" placeholder="z. B. 3100"></div>';
     }
   }else{
-    var kunden=Array.from(new Set(areaEntries('self').map(function(x){return x.client;}).filter(Boolean)));
-    b+='<div class="f"><label>Kunde</label><input type="text" id="f-client" list="cl" value="'+esc(g('client','client'))+'" placeholder="Name des Kunden">'
-      +'<datalist id="cl">'+kunden.map(function(c){return '<option value="'+esc(c)+'"></option>';}).join('')+'</datalist>'
-      +(errs.client?'<div class="err">'+errs.client+'</div>':'')+'</div>';
     b+='<div class="f"><label>Abrechnung</label><div class="seg" style="margin-bottom:9px">'
       +'<button class="'+(ui.fBilling==='fix'?'on':'')+'" onclick="A.setBilling(\'fix\')">Festbetrag</button>'
       +'<button class="'+(ui.fBilling==='hourly'?'on':'')+'" onclick="A.setBilling(\'hourly\')">Stundensatz</button></div>';
     if(ui.fBilling==='fix'){
-      b+='<input type="number" inputmode="decimal" step="0.01" min="0" id="f-amount" value="'+g('amount','amount')+'" oninput="A.liveCalc()" placeholder="Betrag in €">'
+      b+='<input type="number" inputmode="decimal" step="0.01" min="0" id="f-amount" value="'+g('amount','amount')+'" oninput="A.liveCalc()" placeholder="Honorar in €">'
         +(errs.amount?'<div class="err">'+errs.amount+'</div>':'');
     }else{
       b+='<input type="number" inputmode="decimal" step="0.01" min="0" id="f-rate" value="'+g('rate','rate',settings.rateSelf||'')+'" oninput="A.liveCalc()" placeholder="€ pro Stunde">'
         +(errs.rate?'<div class="err">'+errs.rate+'</div>':'');
     }
     b+='</div>';
+    b+='<div class="two"><div class="f"><label>Anzahlung (€)</label>'
+      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-anz" value="'+g('anz','anzahlung')+'" oninput="A.liveCalc()"></div>'
+      +'<div class="f"><label>Ausgaben (€)</label>'
+      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-ausg" value="'+g('ausg','ausgaben')+'" oninput="A.liveCalc()"></div></div>';
     b+='<div class="f"><label>Was</label><input type="text" id="f-was" value="'+esc(g('was','was'))+'" placeholder="z. B. Fotografische Begleitung"></div>';
+    b+='<div class="f"><label>Ort</label><input type="text" id="f-ort" value="'+esc(g('ort','ort'))+'" placeholder="z. B. Schlosshof Aichach"></div>';
+    b+='<div class="two"><div class="f"><label>Telefon</label><input type="tel" id="f-tel" value="'+esc(g('tel','telefon'))+'"></div>'
+      +'<div class="f"><label>E-Mail</label><input type="email" id="f-mail" value="'+esc(g('mail','email'))+'"></div></div>';
+    b+='<div class="two"><div class="f"><label>Rechnungsnr.</label><input type="text" id="f-rech" value="'+esc(g('rech','rechnung'))+'"></div>'
+      +'<div class="f"><label>Anzahl Fotos</label><input type="number" inputmode="numeric" min="0" id="f-fotos" value="'+g('fotos','fotos')+'"></div></div>';
   }
 
-  b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Besonderheiten, Ort, Absprachen …">'+esc(g('notiz','notiz'))+'</textarea></div>';
+  b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Besonderheiten, Absprachen …">'+esc(g('notiz','notiz'))+'</textarea></div>';
 
   var acts='<div class="acts">'
     +(ui.editId?'<button class="btn btn-line" style="color:var(--red)" onclick="A.trashEntry()">Papierkorb</button>':'')
     +'<button class="btn btn-fill" onclick="A.saveForm()">Speichern</button></div>';
-  return shell(ui.editId?'Eintrag bearbeiten':'Neuer Eintrag',b,acts);
+  return shell(ui.editId?'Bearbeiten':(ui.fArea==='self'?'Neuer Auftrag':'Neuer Eintrag'),b,acts);
 }
 
 function sheetSettle(){
-  var t=settleTargets(), soll=add(t.map(amountOf));
-  var b='<div class="hint">'+(ui.settleScope?'Einzelner Eintrag':t.length+' offene Einträge in '+mLong(ui.month))+' · Soll <b>'+eur(soll)+'</b></div>';
+  var t=settleTargets(), soll=add(t.map(offenOf));
+  var b='<div class="hint">'+(ui.settleScope?'Einzelner Eintrag':t.length+' offene Einträge in '+mLong(ui.month))+' · Offen <b>'+eur(soll)+'</b></div>';
   b+='<div class="f"><label>Tatsächlich erhalten</label><input type="number" inputmode="decimal" step="0.01" id="s-amount" value="'+soll.toFixed(2)+'"></div>';
   b+='<div class="f"><label>Zahlungsart</label><select id="s-method">'
     +'<option>Banküberweisung</option><option>Bar</option><option>PayPal</option><option>Sonstiges</option></select></div>';
@@ -886,12 +1105,11 @@ function sheetSettings(){
       +'</div></div>';
   }).join('');
   b+='<button class="btn btn-line btn-sm" style="margin-bottom:16px" onclick="A.addSatz()">+ Zeitraum hinzufügen</button>';
-
   b+='<div class="f"><label>Fahrtgeld (€ pro km)</label><input type="number" step="0.01" id="st-kmrate" value="'+settings.kmRate+'"></div>';
   b+='<div class="f"><label>Erst ab … Kilometer</label><input type="number" step="1" id="st-kmfrei" value="'+settings.kmFrei+'"></div>';
   b+='<div class="f"><label>Fahrzeit wird gezählt zu … %</label><input type="number" step="1" id="st-faktor" value="'+Math.round((settings.fahrFaktor||0)*100)+'"></div>';
-  b+='<div class="f"><label>Selbstständig · Standard-Stundensatz (€)</label><input type="number" step="0.01" id="st-self" value="'+(settings.rateSelf||'')+'"></div>';
-  b+='<div style="display:flex;gap:16px;justify-content:center;margin-top:6px;flex-wrap:wrap">'
+  b+='<div class="f"><label>Aufträge · Standard-Stundensatz (€)</label><input type="number" step="0.01" id="st-self" value="'+(settings.rateSelf||'')+'"></div>';
+  b+='<div class="homelinks" style="margin-top:6px">'
     +'<button class="linkbtn" onclick="A.openTrash()">Papierkorb ('+imPapier().length+')</button>'
     +'<button class="linkbtn" onclick="A.openBackup()">Sicherung</button>'
     +'<button class="linkbtn" onclick="A.openPw()">Passwort ändern</button>'
@@ -905,7 +1123,7 @@ function sheetTrash(){
   var b='<div class="hint">Gelöschte Einträge bleiben hier vollständig erhalten. '
     +'Nichts verschwindet von selbst – nur du entfernst hier endgültig.</div>';
   b+= t.length ? t.map(function(e){
-      return '<div class="lrow"><div><div class="lrow-t">'+esc(e.was||e.client||areaName(e.area))+'</div>'
+      return '<div class="lrow"><div><div class="lrow-t">'+esc(e.client||e.was||areaName(e.area))+'</div>'
         +'<div class="lrow-s">'+dLang(e.date)+' · '+areaName(e.area)+' · '+eur(amountOf(e))+'</div></div>'
         +'<div class="lrow-a"><button class="btn btn-line btn-sm" onclick="A.restoreEntry(\''+e.id+'\')">Zurück</button>'
         +'<button class="btn btn-line btn-sm" style="color:var(--red)" onclick="A.purgeEntry(\''+e.id+'\')">Endgültig</button></div></div>';
@@ -918,12 +1136,12 @@ function sheetBackup(){
   var lb=settings.letztesBackup;
   var b='<div class="hint">Ein PDF ist zum Ansehen und Archivieren. Zum <b>Wiederherstellen</b> brauchst du '
     +'eine dieser Datensicherungen.'+(lb?' Letzte Sicherung: <b>'+dLang(lb.slice(0,10))+'</b>.':' Noch keine Sicherung erstellt.')+'</div>';
-  b+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">'
+  b+='<div class="btnrow">'
     +'<button class="btn btn-line btn-sm" onclick="A.exportJSON()">Als Datei laden</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.exportCSV()">CSV-Tabelle</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.pickFile()">Sicherung einspielen</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.openRestore()">Text einfügen</button></div>';
-  b+='<div class="hint">Oder den Text kopieren und z. B. in den Notizen ablegen:</div>'
+  b+='<div class="hint" style="margin-top:14px">Oder den Text kopieren und z. B. in den Notizen ablegen:</div>'
     +'<textarea class="ta" id="bk" readonly onclick="this.select()">'+esc(json)+'</textarea>';
   var acts='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Schließen</button>'
     +'<button class="btn btn-fill" id="bkbtn" onclick="A.copyBackup()">Kopieren</button></div>';
@@ -941,8 +1159,8 @@ function sheetReset(){
   var b='<div class="banner">Alle Einträge, Abrechnungen, der Papierkorb <b>und das Passwort</b> werden '
     +'von diesem Gerät entfernt. Ohne vorher geladene Sicherung sind die Daten dann weg.</div>'
     +'<div class="hint" style="margin-top:12px">Betroffen: '+alive().length+' Einträge und '+imPapier().length+' im Papierkorb.</div>'
-    +'<label style="display:flex;gap:9px;align-items:flex-start;font-size:14px;margin-bottom:14px;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:400">'
-    +'<input type="checkbox" id="wipeack" style="width:auto;margin-top:3px" onchange="A.checkWipe()"> Ich habe eine aktuelle Sicherung (oder brauche keine).</label>'
+    +'<label class="check"><input type="checkbox" id="wipeack" onchange="A.checkWipe()"> '
+    +'Ich habe eine aktuelle Sicherung (oder brauche keine).</label>'
     +'<div class="f"><label>Zum Bestätigen ALLES LÖSCHEN eintippen</label>'
     +'<input id="wipeword" autocomplete="off" spellcheck="false" oninput="A.checkWipe()"></div>';
   var acts='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
@@ -963,10 +1181,10 @@ function sheetReport(){
   var js=jahre(ui.repBereich==='self'?'self':'martin');
   if(!ui.repJahr||js.indexOf(ui.repJahr)<0) ui.repJahr=js[0];
   if(ui.repMonat==='') ui.repMonat=String(new Date().getMonth());
-  var b='<div class="hint">Erzeugt einen Bericht mit Kennzahlen, Diagrammen und der vollständigen '
-    +'Tabelle. In der Vorschau auf <b>Drucken</b> und im Druckdialog „Als PDF sichern“ wählen.</div>';
+  var b='<div class="hint">Bericht mit Kennzahlen, Diagrammen und der vollständigen Tabelle. '
+    +'In der Vorschau auf <b>Drucken</b> und im Druckdialog „Als PDF sichern“ wählen.</div>';
   b+='<div class="f"><label>Bereich</label><select id="rp-bereich" onchange="A.repChange()">'
-    +['martin','self','beide'].map(function(x){
+    +['self','martin','beide'].map(function(x){
       return '<option value="'+x+'"'+(ui.repBereich===x?' selected':'')+'>'+(x==='beide'?'Beide Bereiche':areaName(x))+'</option>';}).join('')
     +'</select></div>';
   b+='<div class="f"><label>Umfang</label><select id="rp-umfang" onchange="A.repChange()">'
@@ -979,8 +1197,7 @@ function sheetReport(){
     if(ui.repUmfang==='monat'){
       b+='<div class="f"><label>Monat</label><select id="rp-monat" onchange="A.repChange()">'
         +[0,1,2,3,4,5,6,7,8,9,10,11].map(function(i){
-          return '<option value="'+i+'"'+(String(i)===String(ui.repMonat)?' selected':'')+'>'
-            +new Date(2000,i,1).toLocaleDateString('de-DE',{month:'long'})+'</option>';}).join('')+'</select></div>';
+          return '<option value="'+i+'"'+(String(i)===String(ui.repMonat)?' selected':'')+'>'+mName(i)+'</option>';}).join('')+'</select></div>';
     }else b+='<div></div>';
     b+='</div>';
   }
@@ -995,8 +1212,13 @@ function repChange(){
   if(document.getElementById('rp-monat')) ui.repMonat=v('rp-monat');
   render();
 }
-function openReport(){ui.sheet='report';render();}
-function pickFile(){var i=document.getElementById('fileimp');if(i)i.click();}
+function openReport(){
+  ui.repBereich=ui.view==='area'?ui.area:ui.repBereich;
+  ui.repUmfang=ui.view==='area'&&ui.modus==='jahr'?'jahr':'monat';
+  ui.repJahr=ui.jahr||curY();
+  ui.repMonat=String(Number((ui.month||curMk()).slice(5,7))-1);
+  ui.sheet='report';render();
+}
 
 /* ============ bericht ============ */
 
@@ -1008,14 +1230,21 @@ function repTile(l,val,n){
 function reportBlock(area,list,titel){
   var s=summe(list);
   var acc=area==='martin'?'#3F5D52':'#8C5F3F';
+  var kacheln = area==='martin'
+    ? [['Einträge',String(s.n),titel],['Zeit gesamt',hm(s.zeit)+' Std','tatsächlich gearbeitet'],
+       ['Bezahlte Zeit',hm(s.bez)+' Std','Fahrzeit zu '+Math.round((settings.fahrFaktor||0)*100)+' %'],
+       ['Gefahrene km',String(s.km)+' km','ab '+(settings.kmFrei||0)+' km vergütet'],
+       ['Betrag',eur(s.betrag),'Summe im Zeitraum'],
+       ['Davon offen',eur(s.offen),s.offen?'noch nicht abgerechnet':'alles abgerechnet']]
+    : [['Aufträge',String(s.nRel),s.storno?s.storno+' storniert (zählen nicht)':titel],
+       ['Honorar',eur(s.betrag),'ohne Stornos'],
+       ['Anzahlungen',eur(s.anzahlung),'bereits erhalten'],
+       ['Noch offen',eur(s.offen),s.offen?'ausstehend':'alles bezahlt'],
+       ['Ausgaben',eur(s.ausgaben),'erfasste Auslagen'],
+       ['Ergebnis',eur(s.ergebnis),'Honorar minus Ausgaben']];
+
   var h='<div class="rep-sec"><h2>'+esc(areaName(area))+' · Kennzahlen</h2><div class="rep-tiles">'
-    +repTile('Einträge',String(s.n),titel)
-    +repTile('Zeit gesamt',hm(s.zeit)+' Std','tatsächlich gearbeitet')
-    +repTile('Bezahlte Zeit',hm(s.bez)+' Std','Fahrzeit zu '+Math.round((settings.fahrFaktor||0)*100)+' %')
-    +repTile('Gefahrene KM',String(s.km)+' km','ab '+(settings.kmFrei||0)+' km vergütet')
-    +repTile('Betrag',eur(s.betrag),'Summe im Zeitraum')
-    +repTile('Davon offen',eur(s.offen),s.offen?'noch nicht abgerechnet':'alles abgerechnet')
-    +'</div></div>';
+    +kacheln.map(function(k){return repTile(k[0],k[1],k[2]);}).join('')+'</div></div>';
 
   if(area==='martin'){
     var nachArt=[
@@ -1025,21 +1254,20 @@ function reportBlock(area,list,titel){
       {label:'Fahrtgeld',   f:function(e){return e.modus==='kilometer';}}
     ].map(function(g){
       var sub=list.filter(g.f);
-      return {label:g.label,value:add(sub.map(amountOf)),tip:sub.length+' Zeilen'};
+      return {label:g.label,value:add(sub.map(amountOf)),tip:nStk(sub.length,'Zeile','Zeilen')};
     });
     h+='<div class="rep-sec"><h2>Betrag nach Art</h2>'+rowChart(nachArt,{width:1000,color:acc,aria:'Betrag nach Art'})+'</div>';
   }else{
-    var kunden={};
-    list.forEach(function(e){kunden[e.client||'Ohne Kunde']=(kunden[e.client||'Ohne Kunde']||0)+amountOf(e);});
-    h+='<div class="rep-sec"><h2>Betrag nach Kunde</h2>'
-      +rowChart(Object.keys(kunden).map(function(k){return {label:k,value:kunden[k]};}),{width:1000,color:acc,aria:'Betrag nach Kunde'})+'</div>';
+    h+='<div class="rep-sec"><h2>Honorar nach Auftragsart</h2>'
+      +rowChart(ARTEN.map(function(x){
+        var g=list.filter(function(e){return e.art===x&&zaehlt(e);});
+        return {label:x,value:add(g.map(amountOf)),tip:nStk(g.length,'Auftrag','Aufträge')};
+      }),{width:1000,color:acc,aria:'Honorar nach Auftragsart'})+'</div>';
   }
 
-  h+='<div class="rep-sec"><h2>Alle Zeilen im Zeitraum</h2>';
-  if(!list.length){
-    h+='<p class="rep-note">In diesem Zeitraum wurden keine Zeilen erfasst.</p></div>';
-    return h;
-  }
+  h+='<div class="rep-sec"><h2>'+(area==='self'?'Alle Aufträge im Zeitraum':'Alle Zeilen im Zeitraum')+'</h2>';
+  if(!list.length) return h+'<p class="rep-note">In diesem Zeitraum wurde nichts erfasst.</p></div>';
+
   if(area==='martin'){
     h+='<table class="rep-table"><thead><tr>'
       +'<th>Art</th><th>Fahrzeit / regulär</th><th>Datum</th><th>Beginn</th><th>Ende</th>'
@@ -1064,33 +1292,42 @@ function reportBlock(area,list,titel){
       +'<td colspan="4"></td></tr></tfoot></table>';
   }else{
     h+='<table class="rep-table"><thead><tr>'
-      +'<th>Datum</th><th>Kunde</th><th>Was</th><th>Abrechnung</th>'
-      +'<th class="rep-r">Zeit</th><th class="rep-r">bezahlte Zeit</th><th class="rep-r">Satz</th>'
-      +'<th class="rep-r">Betrag</th><th>Kommentar</th><th>Bez.</th></tr></thead><tbody>'
+      +'<th>Datum</th><th>Kunde</th><th>Auftragsart</th><th>Ort</th><th>Was</th>'
+      +'<th class="rep-r">Zeit</th><th>Abrechnung</th><th class="rep-r">Honorar</th>'
+      +'<th class="rep-r">Anzahlung</th><th class="rep-r">Ausgaben</th><th class="rep-r">Offen</th>'
+      +'<th>Status</th><th>Rechnungsnr</th><th>Kommentar</th></tr></thead><tbody>'
       +list.map(function(e){
-        return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.client||'')+'</td><td>'+esc(e.was||'')+'</td>'
-          +'<td>'+(e.billing==='hourly'?'Stundensatz':'Festbetrag')+'</td>'
-          +'<td class="rep-r">'+hm(rawHours(e))+'</td><td class="rep-r">'+dec2(paidHours(e))+'</td>'
-          +'<td class="rep-r">'+(rateOf(e)?eur(rateOf(e)):'—')+'</td>'
-          +'<td class="rep-r">'+eur(amountOf(e))+'</td><td>'+esc(e.notiz||'')+'</td>'
-          +'<td>'+(e.paid?'✓':'offen')+'</td></tr>';
+        var st=e.status==='Storniert';
+        return '<tr'+(st?' style="color:#9A938A"':'')+'><td>'+dShort(e.date)+'</td><td>'+esc(e.client||'')+'</td>'
+          +'<td>'+esc(e.art)+'</td><td>'+esc(e.ort||'')+'</td><td>'+esc(e.was||'')+'</td>'
+          +'<td class="rep-r">'+(rawHours(e)?hm(rawHours(e)):'')+'</td>'
+          +'<td>'+(e.billing==='hourly'?eur(rateOf(e))+'/Std':'Festbetrag')+'</td>'
+          +'<td class="rep-r">'+eur(amountOf(e))+'</td>'
+          +'<td class="rep-r">'+(anzOf(e)?eur(anzOf(e)):'')+'</td>'
+          +'<td class="rep-r">'+(ausgOf(e)?eur(ausgOf(e)):'')+'</td>'
+          +'<td class="rep-r">'+(offenOf(e)?eur(offenOf(e)):'—')+'</td>'
+          +'<td>'+esc(e.status)+'</td><td>'+esc(e.rechnung||'')+'</td>'
+          +'<td>'+esc(e.notiz||'')+'</td></tr>';
       }).join('')
-      +'</tbody><tfoot><tr><td colspan="4">SUMME</td><td class="rep-r">'+hm(s.zeit)+'</td>'
-      +'<td class="rep-r">'+dec2(s.bez)+'</td><td></td><td class="rep-r">'+eur(s.betrag)+'</td>'
-      +'<td colspan="2"></td></tr></tfoot></table>';
+      +'</tbody><tfoot><tr><td colspan="7">SUMME (ohne Stornos)</td>'
+      +'<td class="rep-r">'+eur(s.betrag)+'</td><td class="rep-r">'+eur(s.anzahlung)+'</td>'
+      +'<td class="rep-r">'+eur(s.ausgaben)+'</td><td class="rep-r">'+eur(s.offen)+'</td>'
+      +'<td colspan="3"></td></tr></tfoot></table>';
   }
   h+='</div>';
 
-  var offen=list.filter(function(e){return !e.paid;});
-  if(offen.length===list.length){
-    // Nichts abgerechnet – die Tabelle oben wäre sonst Zeile für Zeile doppelt.
-    h+='<div class="rep-sec"><h2>Noch offen</h2><p class="rep-note">Alle '+list.length
-      +' Zeilen dieses Zeitraums sind noch offen: <b>'+eur(s.offen)+'</b>.</p></div>';
+  var offen=list.filter(function(e){return !e.paid&&zaehlt(e);});
+  var wort=area==='self'?['Der einzige Auftrag','Aufträge']:['Die einzige Zeile','Zeilen'];
+  if(offen.length===list.filter(zaehlt).length&&offen.length){
+    h+='<div class="rep-sec"><h2>Noch offen</h2><p class="rep-note">'
+      +(offen.length===1 ? wort[0]+' dieses Zeitraums ist noch offen: '
+                         : 'Alle '+offen.length+' '+wort[1]+' dieses Zeitraums sind noch offen: ')
+      +'<b>'+eur(s.offen)+'</b>.</p></div>';
   }else if(offen.length){
     h+='<div class="rep-sec"><h2>Noch offen</h2><table class="rep-table"><tbody>'
       +offen.map(function(e){
-        return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.was||e.client||'')+'</td>'
-          +'<td class="rep-r">'+eur(amountOf(e))+'</td></tr>';}).join('')
+        return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.client||e.was||'')+'</td>'
+          +'<td class="rep-r">'+eur(offenOf(e))+'</td></tr>';}).join('')
       +'</tbody><tfoot><tr><td colspan="2">Summe offen</td><td class="rep-r">'+eur(s.offen)+'</td></tr></tfoot></table></div>';
   }
   return h;
@@ -1098,7 +1335,7 @@ function reportBlock(area,list,titel){
 
 function showReport(){
   repChange();
-  var bereiche = ui.repBereich==='beide' ? ['martin','self'] : [ui.repBereich];
+  var bereiche = ui.repBereich==='beide' ? ['self','martin'] : [ui.repBereich];
   var umfang=ui.repUmfang, jahr=ui.repJahr, monat=Number(ui.repMonat);
   var titel, kurz;
 
@@ -1114,14 +1351,13 @@ function showReport(){
   var alleZeilen=[]; bereiche.forEach(function(a){alleZeilen=alleZeilen.concat(listFor(a));});
   var g=summe(alleZeilen);
 
-  /* Zeitverlauf über alle gewählten Bereiche */
   var verlauf, vTitel;
   if(umfang==='monat'){
     var tage=new Date(Number(jahr),monat+1,0).getDate();
     verlauf=[];
     for(var i=1;i<=tage;i++){
       var iso=jahr+'-'+p2(monat+1)+'-'+p2(i);
-      var w=add(alleZeilen.filter(function(e){return e.date===iso;}).map(amountOf));
+      var w=add(alleZeilen.filter(function(e){return e.date===iso&&zaehlt(e);}).map(amountOf));
       verlauf.push({label:String(i),value:w,tip:dLang(iso)+': '+eur(w)});
     }
     vTitel='Betrag pro Tag';
@@ -1129,14 +1365,14 @@ function showReport(){
     verlauf=[];
     for(var m2=0;m2<12;m2++){
       var key=jahr+'-'+p2(m2+1);
-      var w2=add(alleZeilen.filter(function(e){return mk(e.date)===key;}).map(amountOf));
+      var w2=add(alleZeilen.filter(function(e){return mk(e.date)===key&&zaehlt(e);}).map(amountOf));
       verlauf.push({label:mMini(key),value:w2,tip:mLong(key)+': '+eur(w2)});
     }
     vTitel='Betrag pro Monat';
   }else{
     var ys={}; alleZeilen.forEach(function(e){ys[e.date.slice(0,4)]=1;});
     verlauf=Object.keys(ys).sort().map(function(y){
-      var w3=add(alleZeilen.filter(function(e){return e.date.slice(0,4)===y;}).map(amountOf));
+      var w3=add(alleZeilen.filter(function(e){return e.date.slice(0,4)===y&&zaehlt(e);}).map(amountOf));
       return {label:y,value:w3,tip:y+': '+eur(w3)};
     });
     vTitel='Betrag pro Jahr';
@@ -1146,9 +1382,9 @@ function showReport(){
     return mShort(s.ab)+': '+eur0(s.foto)+' / '+eur0(s.ausschank);
   }).join(' · ');
 
-  var h='<div class="rep-head"><div><h1>Auftragsbuch · Arbeitszeit</h1>'
+  var h='<div class="rep-head"><div><h1>Auftragsbuch</h1>'
     +'<div class="rep-sub">'+esc(kurz)+' · '+esc(titel)+' · '
-    +esc(ui.repBereich==='beide'?'Martin und Selbstständig':areaName(ui.repBereich))+'</div></div>'
+    +esc(ui.repBereich==='beide'?'Aufträge und Martin':areaName(ui.repBereich))+'</div></div>'
     +'<div class="rep-meta">Erstellt am '+esc(stamp())+'<br>'+g.n+' Zeilen · '+eur(g.betrag)+'<br>Sicherungsdokument</div></div>';
 
   h+='<div class="rep-sec"><h2>'+esc(vTitel)+'</h2>'
@@ -1175,11 +1411,13 @@ function showReport(){
       +'</tbody></table></div>';
   }
 
-  h+='<div class="rep-sec"><h2>Angewandte Sätze</h2><p class="rep-note">'
-    +'Fotografisch / Ausschank je Zeitraum — '+esc(saetzeText||'keine hinterlegt')+'. '
-    +'Fahrtgeld '+esc(dec2(settings.kmRate))+' € pro km ab '+(settings.kmFrei||0)+' km. '
-    +'Fahrzeit zählt zu '+Math.round((settings.fahrFaktor||0)*100)+' %. '
-    +'Jede Zeile ist mit dem Satz gerechnet, der an ihrem Datum galt.</p></div>';
+  if(bereiche.indexOf('martin')>=0){
+    h+='<div class="rep-sec"><h2>Angewandte Sätze</h2><p class="rep-note">'
+      +'Fotografisch / Ausschank je Zeitraum — '+esc(saetzeText||'keine hinterlegt')+'. '
+      +'Fahrtgeld '+esc(dec2(settings.kmRate))+' € pro km ab '+(settings.kmFrei||0)+' km. '
+      +'Fahrzeit zählt zu '+Math.round((settings.fahrFaktor||0)*100)+' %. '
+      +'Jede Zeile ist mit dem Satz gerechnet, der an ihrem Datum galt.</p></div>';
+  }
 
   h+='<div class="rep-foot"><span>Auftragsbuch · '+esc(titel)+'</span><span>Erstellt am '+esc(stamp())+'</span></div>';
 
@@ -1237,8 +1475,7 @@ function setPw(){
     meta={v:3,salt:b64(salt),iter:PBKDF2_ITER,hint:hint,erstellt:nowISO()};
     localStorage.setItem(K_META,JSON.stringify(meta));
     var alt=legacyData();
-    if(alt){ adopt(alt); ui.legacyOffen=true; }
-    else { adopt(null); }
+    if(alt){ adopt(alt); ui.legacyOffen=true; } else { adopt(null); }
     return persist();
   }).then(boot).catch(function(x){ gate('set','Fehler beim Anlegen: '+x.message); });
 }
@@ -1285,9 +1522,8 @@ function resetLock(){
 
 /* ============ rahmen ============ */
 
-/* Nach Anlegen und nach jedem Entsperren auf der Startseite beginnen –
-   nicht in der Ansicht, die vor dem Sperren zufällig offen war. */
-function boot(){ ui.view='home'; ui.month=curMk(); render(); resetLock(); }
+/* Nach Anlegen und nach jedem Entsperren auf der Startseite beginnen. */
+function boot(){ ui.view='home'; ui.month=curMk(); ui.jahr=curY(); ui.modus='monat'; render(); resetLock(); }
 
 function render(){
   if(!cryptoKey) return;
@@ -1303,9 +1539,10 @@ function render(){
 }
 
 window.A={
-  go:go,setMonth:setMonth,closeSheet:closeSheet,lock:lock,
+  go:go,setMonth:setMonth,setJahr:setJahr,setModus:setModus,zuMonat:zuMonat,
+  toggleSuche:toggleSuche,onSuche:onSuche,onFilter:onFilter,closeSheet:closeSheet,lock:lock,
   openForm:openForm,saveForm:saveForm,trashEntry:trashEntry,restoreEntry:restoreEntry,purgeEntry:purgeEntry,
-  setArea:setArea,setArt:setArt,setModus:setModus,setTimeMode:setTimeMode,setBilling:setBilling,liveCalc:liveCalc,
+  setArea:setArea,setArt:setArt,setModus2:setModus2,setTimeMode:setTimeMode,setBilling:setBilling,liveCalc:liveCalc,
   openSettle:openSettle,doSettle:doSettle,unpay:unpay,
   openSettings:openSettings,saveSettingsForm:saveSettingsForm,addSatz:addSatz,delSatz:delSatz,
   openBackup:openBackup,copyBackup:copyBackup,exportJSON:exportJSON,exportCSV:exportCSV,
@@ -1330,13 +1567,10 @@ function start(){
       +'kann das Auftragsbuch nichts sichern.</div></div>';
     return;
   }
-
   ['click','keydown','pointerdown'].forEach(function(ev){
     document.addEventListener(ev,resetLock,{passive:true});
   });
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape'&&ui.repOffen) closeReport();
-  });
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&ui.repOffen) closeReport(); });
   document.getElementById('reportprint').addEventListener('click',function(){window.print();});
   document.getElementById('reportback').addEventListener('click',closeReport);
 
