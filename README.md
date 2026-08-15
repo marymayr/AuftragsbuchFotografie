@@ -5,7 +5,7 @@ Drei Bücher in einer App, alle nach **Monaten und Jahren** gegliedert:
 - **Selbstständigkeit** – eigene Aufträge mit Kunde, Auftragsart, Ort, Kontakt,
   Honorar, Anzahlung, Ausgaben, Rechnungsnummer, Auftragsstatus und der
   Übermittlung der Fotos.
-- **Anstellung – Martin Slovaczek** – Arbeitszeiten mit Stundensatz, Fahrzeit
+- **Anstellung – Martin Slováček** – Arbeitszeiten mit Stundensatz, Fahrzeit
   und Fahrtgeld.
 - **Betriebsausgaben** – Anschaffungen und Kosten der Selbstständigkeit, von der
   Gewerbeanmeldung bis zum Objektiv.

@@ -290,7 +290,7 @@ function jahre(a){
 function payFor(a,m){return payments.filter(function(p){return p.area===a&&p.month===m;});}
 var BEREICHE=['self','martin','ausgaben'];
 function areaName(a){
-  return a==='martin' ? 'Anstellung – Martin Slovaczek'
+  return a==='martin' ? 'Anstellung – Martin Slováček'
        : a==='ausgaben' ? 'Betriebsausgaben' : 'Selbstständigkeit';
 }
 function areaKurz(a){ return a==='martin'?'Anstellung':a==='ausgaben'?'Betriebsausgaben':'Selbstständigkeit'; }
