@@ -63,7 +63,11 @@ var DEF_FIRMA={
   zahlungsziel:14, kleinunternehmer:true,
   anrede:'Sehr geehrte Damen und Herren,',
   anschreiben:'vielen Dank für den Auftrag. Für meine Leistung stelle ich Ihnen wie vereinbart in Rechnung:',
-  schluss:'Herzlichen Dank für Ihr Vertrauen.'
+  /* Nur ein Vorschlag – der Schlusstext lässt sich je Rechnung frei schreiben. */
+  schluss:'Bitte überweisen Sie den Betrag von {betrag} ohne Abzug bis zum {faellig} auf folgendes Konto:\n'
+         +'{kontoinhaber} · IBAN {iban} · {bank}\n\n'
+         +'Herzlichen Dank für Ihr Vertrauen.\n\n'
+         +'Mit freundlichen Grüßen\n{name}'
 };
 /* Grenzen der Kleinunternehmerregelung nach § 19 UStG (Stand 2025):
    Vorjahresumsatz höchstens 25.000 €, laufendes Jahr höchstens 100.000 €.
@@ -71,7 +75,7 @@ var DEF_FIRMA={
 var KU_VORJAHR=25000, KU_LAUFEND=100000;
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v12 · 16.09.2026';
+var APP_VERSION='v13 · 16.09.2026';
 /* Kennzeichen des Excel-Stands. Wird nach dem einmaligen Übernehmen in den
    Einstellungen vermerkt, damit es nicht bei jedem Start erneut passiert. */
 var XL_STAND='martin-arbeitszeit-bezahlt-bis-2026-07-25';
@@ -236,6 +240,8 @@ function normEntry(o){
     e.haendler=o.haendler||'';
     e.zahlart=ZAHLARTEN.indexOf(o.zahlart)>=0?o.zahlart:'Bankkarte';
     e.beleg=!!o.beleg;
+    /* Zählt dieser Posten für die Steuer? Voreingestellt ja. */
+    e.steuer=o.steuer!==false;
     /* Von einer laufenden Kostenstelle erzeugt – daran erkennt die App,
        welche Posten sie selbst gebucht hat. */
     if(o.aboId) e.aboId=o.aboId;
@@ -250,6 +256,9 @@ function normEntry(o){
     e.anzahlung=cent(Number(o.anzahlung)||0); e.ausgaben=cent(Number(o.ausgaben)||0);
     e.rechnung=o.rechnung||'';
     e.uebergabe=UEBERGABE.indexOf(o.uebergabe)>=0?o.uebergabe:UEBERGABE[0];
+    /* Gefälligkeiten für Freunde bekommen hier das Häkchen weg: der Auftrag
+       bleibt mit seinem Wert im Buch, taucht aber in der Steuer nicht auf. */
+    e.steuer=o.steuer!==false;
     if(o.fotos) e.fotos=Number(o.fotos)||0;
   }
   return e;
@@ -621,12 +630,14 @@ function treffer(a){
 }
 
 /* ============ steuern ============
-   Die Einnahmen-Überschuss-Rechnung folgt dem Zuflussprinzip: Einnahmen
-   zählen in dem Jahr, in dem das Geld da war, Ausgaben in dem Jahr, in dem
-   sie bezahlt wurden. Wo kein Zahlungsdatum hinterlegt ist, nimmt die App
-   ersatzweise das Datum des Eintrags und weist die Summe gesondert aus –
-   damit klar bleibt, was belegt ist und was geschätzt.
+   Die Übersicht folgt dem Zuflussprinzip: Einnahmen zählen in dem Jahr und
+   Monat, in dem das Geld da war, Ausgaben dann, wenn sie bezahlt wurden.
+   Wo kein Zahlungsdatum hinterlegt ist, nimmt die App ersatzweise das Datum
+   des Eintrags und weist die Summe gesondert aus.
+   Einträge ohne Häkchen „zählt für die Steuer" bleiben durchgehend außen vor.
    ================================================================== */
+
+function steuerZaehlt(e){ return e.steuer!==false; }
 
 function einnahmePosten(e){
   var out=[], ges=amountOf(e);
@@ -640,80 +651,58 @@ function einnahmePosten(e){
   }
   return out;
 }
-/** Was in einem Jahr tatsächlich eingegangen ist. */
 function zuflussJahr(area,y){
-  var summe=0, ungenau=0;
+  var summe=0;
   areaEntries(area).forEach(function(e){
-    einnahmePosten(e).forEach(function(z){
-      if(z.datum.slice(0,4)!==y) return;
-      summe+=z.betrag;
-      if(!z.genau) ungenau+=z.betrag;
-    });
+    if(!steuerZaehlt(e)) return;
+    einnahmePosten(e).forEach(function(z){ if(z.datum.slice(0,4)===y) summe+=z.betrag; });
   });
-  return {summe:cent(summe), ungenau:cent(ungenau)};
+  return cent(summe);
 }
-/** Was in einem Jahr geleistet wurde – unabhängig davon, wann gezahlt wurde. */
 function leistungJahr(area,y){
-  return cent(add(yearEntries(area,y).filter(zaehlt).map(amountOf)));
+  return cent(add(yearEntries(area,y).filter(function(e){return zaehlt(e)&&steuerZaehlt(e);}).map(amountOf)));
 }
+
+/** Einnahmen und Ausgaben eines Jahres, nach Monaten aufgeteilt. */
 function steuerJahr(y,basis){
   basis = basis==='leistung' ? 'leistung' : 'zufluss';
-  var zu=zuflussJahr('self',y);
-  var einnahmen = basis==='leistung' ? leistungJahr('self',y) : zu.summe;
+  var monate=[];
+  for(var i=0;i<12;i++) monate.push({mk:y+'-'+p2(i+1), ein:0, aus:0});
+  var idx=function(d){ return Number(d.slice(5,7))-1; };
+  var ausEin=0, ausAus=0, ungenau=0;
 
-  /* Ausgaben sind mit ihrem Zahlungsdatum erfasst – beide Betrachtungen
-     führen hier zum selben Ergebnis. */
-  var ausgListe=yearEntries('ausgaben',y);
-  var ausgaben=cent(add(ausgListe.map(amountOf)));
-  var nachKat=KATEGORIEN.map(function(k){
-    var g=ausgListe.filter(function(e){return e.kat===k;});
-    return {kat:k, n:g.length, betrag:cent(add(g.map(amountOf)))};
-  }).filter(function(x){return x.n;});
-  var ohneBeleg=cent(add(ausgListe.filter(function(e){return !e.beleg;}).map(amountOf)));
+  areaEntries('self').forEach(function(e){
+    if(!zaehlt(e)) return;
+    if(basis==='leistung'){
+      if(e.date.slice(0,4)!==y) return;
+      if(!steuerZaehlt(e)){ ausEin+=amountOf(e); return; }
+      monate[idx(e.date)].ein+=amountOf(e);
+    }else{
+      einnahmePosten(e).forEach(function(z){
+        if(z.datum.slice(0,4)!==y) return;
+        if(!steuerZaehlt(e)){ ausEin+=z.betrag; return; }
+        monate[idx(z.datum)].ein+=z.betrag;
+        if(!z.genau) ungenau+=z.betrag;
+      });
+    }
+  });
+  yearEntries('ausgaben',y).forEach(function(e){
+    if(!steuerZaehlt(e)){ ausAus+=amountOf(e); return; }
+    monate[idx(e.date)].aus+=amountOf(e);
+  });
 
-  var lohnZu=zuflussJahr('martin',y);
-  var lohn = basis==='leistung' ? leistungJahr('martin',y) : lohnZu.summe;
-
-  /* Für § 19 UStG zählt der vereinnahmte Gesamtumsatz – unabhängig davon,
-     welche Betrachtung oben gewählt ist. */
-  var umsatz=zuflussJahr('self',y).summe;
-  var umsatzVor=zuflussJahr('self',String(Number(y)-1)).summe;
-
-  var offen=cent(add(areaEntries('self').filter(function(e){
-    return e.date.slice(0,4)===y;
-  }).map(offenOf)));
-
-  var rg=rgAlive().filter(function(r){return r.datum.slice(0,4)===y;});
-
+  monate.forEach(function(m){ m.ein=cent(m.ein); m.aus=cent(m.aus); m.saldo=cent(m.ein-m.aus); });
+  var ein=cent(add(monate.map(function(m){return m.ein;})));
+  var aus=cent(add(monate.map(function(m){return m.aus;})));
   return {
-    jahr:y, basis:basis,
-    einnahmen:einnahmen, einnahmenUngenau:basis==='zufluss'?zu.ungenau:0,
-    einnahmenAndere: basis==='leistung' ? zu.summe : leistungJahr('self',y),
-    ausgaben:ausgaben, nachKat:nachKat, ohneBeleg:ohneBeleg,
-    gewinn:cent(einnahmen-ausgaben),
-    lohn:lohn, lohnUngenau:basis==='zufluss'?lohnZu.ungenau:0,
-    umsatz:umsatz, umsatzVor:umsatzVor,
-    grenzeVor:Number(settings.kuVorjahr)||KU_VORJAHR,
-    grenzeLauf:Number(settings.kuLaufend)||KU_LAUFEND,
-    offen:offen,
-    ausgListe:ausgListe,
-    rg:rg, rgSum:rgSum(rg),
-    nEinn:yearEntries('self',y).filter(zaehlt).length
+    jahr:y, basis:basis, monate:monate,
+    einnahmen:ein, ausgaben:aus, gewinn:cent(ein-aus),
+    ausgenommenEin:cent(ausEin), ausgenommenAus:cent(ausAus), ungenau:cent(ungenau),
+    lohn: basis==='leistung' ? leistungJahr('martin',y) : zuflussJahr('martin',y),
+    umsatz: zuflussJahr('self',y), umsatzVor: zuflussJahr('self',String(Number(y)-1)),
+    grenzeVor: Number(settings.kuVorjahr)||KU_VORJAHR,
+    grenzeLauf: Number(settings.kuLaufend)||KU_LAUFEND
   };
-}
-/** Kurzurteil zur Kleinunternehmerregelung. */
-function kuLage(st){
-  if(st.umsatzVor>st.grenzeVor)
-    return {ok:false, text:'Der Umsatz des Vorjahres lag über '+eur0(st.grenzeVor)
-      +'. Für '+st.jahr+' gilt die Kleinunternehmerregelung dann nicht mehr – bitte steuerlich beraten lassen.'};
-  if(st.umsatz>st.grenzeLauf)
-    return {ok:false, text:'Der Umsatz überschreitet im laufenden Jahr '+eur0(st.grenzeLauf)
-      +'. Ab diesem Zeitpunkt entfällt die Regelung – bitte steuerlich beraten lassen.'};
-  if(st.umsatz>st.grenzeVor*0.8)
-    return {ok:true, warn:true, text:'Der Umsatz nähert sich der Grenze von '+eur0(st.grenzeVor)
-      +' für das Folgejahr. Bleibt er darüber, entfällt die Regelung im nächsten Jahr.'};
-  return {ok:true, text:'Vorjahr '+eur(st.umsatzVor)+' (Grenze '+eur0(st.grenzeVor)+') und laufendes Jahr '
-    +eur(st.umsatz)+' (Grenze '+eur0(st.grenzeLauf)+') liegen darunter. Die Kleinunternehmerregelung greift.'};
 }
 
 /* ============ diagramme ============ */
@@ -846,6 +835,8 @@ function keepDraft(){
    'f-client','f-amount','f-rate','f-ort','f-tel','f-mail','f-anz','f-ausg','f-rech','f-status','f-kunstart',
    'f-ueber','f-bez','f-kat','f-betrag','f-haendler','f-zahlart']
     .forEach(function(id){var el=document.getElementById(id);if(el)ui.draft[id.slice(2)]=el.value;});
+  var st=document.getElementById('f-steuer');
+  if(st) ui.draft.steuer=st.checked?'1':'0';
 }
 function setArea(x){
   keepDraft(); ui.fArea=x;
@@ -862,6 +853,12 @@ function setArt(x){keepDraft();ui.fArt2=x;render();}
 function setModus2(x){keepDraft();ui.fModus=x;render();}
 function setTimeMode(x){keepDraft();ui.fTime=x;render();}
 function setBilling(x){keepDraft();ui.fBilling=x;render();}
+
+/* Steht das Häkchen „zählt für die Steuer"? Ohne Feld gilt: ja. */
+function steuerHaken(){
+  var el=document.getElementById('f-steuer');
+  return el ? !!el.checked : true;
+}
 
 function saveForm(){
   var errs={}, old=ui.editId?entries.find(function(x){return x.id===ui.editId;}):null;
@@ -896,6 +893,7 @@ function saveForm(){
     /* Ein von den laufenden Kosten gebuchter Posten bleibt auch nach dem
        Bearbeiten als solcher erkennbar. */
     if(old&&old.aboId) e.aboId=old.aboId;
+    e.steuer=steuerHaken();
     e.timeMode='duration'; e.durH=0; e.durM=0;
     if(!e.bez) errs.bez='Bezeichnung fehlt';
     if(!e.betrag) errs.betrag='Betrag fehlt';
@@ -906,6 +904,7 @@ function saveForm(){
     e.ort=v('f-ort').trim(); e.telefon=v('f-tel').trim(); e.email=v('f-mail').trim();
     e.was=v('f-was').trim(); e.rechnung=v('f-rech').trim();
     e.uebergabe=v('f-ueber')||UEBERGABE[0];
+    e.steuer=steuerHaken();
     e.anzahlung=num(v('f-anz'));
     e.billing=ui.fBilling;
     if(!e.client) errs.client='Kunde fehlt';
@@ -1320,8 +1319,7 @@ function viewHome(){
   h+=noteStream();
   h+='<div class="homelinks">'
     +'<button class="linkbtn" onclick="A.openReport()">Bericht &amp; PDF</button>'
-    +'<button class="linkbtn" onclick="A.openSteuer()">Steuern &amp; EÜR</button>'
-    +'<button class="linkbtn" onclick="A.openAbos()">Laufende Kosten</button>'
+    +'<button class="linkbtn" onclick="A.openSteuer()">Einnahmen &amp; Ausgaben</button>'
     +'<button class="linkbtn" onclick="A.openSettings()">Sätze &amp; Einstellungen</button>'
     +'<button class="linkbtn" onclick="A.openBackup()">Sicherung</button>'
     +'<button class="linkbtn" onclick="A.lock()">Sperren</button></div>';
@@ -1489,6 +1487,7 @@ function viewArea(){
     +'<button class="back" onclick="A.go(\'home\')">‹</button>'
     +'<span class="topbar-title'+(a==='martin'?' lang':'')+'">'+esc(areaName(a))+'</span>'
     +'<button class="iconbtn'+(ui.sucheAn?' on':'')+'" title="Suchen" onclick="A.toggleSuche()">⌕</button>'
+    +(a==='ausgaben'?'<button class="iconbtn" title="Laufende Kosten" onclick="A.openAbos()">↻</button>':'')
     +'<button class="iconbtn" title="Bericht" onclick="A.openReport()">▤</button>'
     +'<button class="iconbtn" title="Einstellungen" onclick="A.openSettings()">⚙</button></div>';
 
@@ -1551,8 +1550,30 @@ function trefferHTML(a){
     +'<p class="hint" style="margin-top:10px">Die Suche geht über alle Monate und Jahre dieses Bereichs.</p>';
 }
 
+/* Die laufenden Kosten gehören sichtbar in die Betriebsausgaben, nicht ans
+   Seitenende: hier steht, was in diesem Monat von selbst gebucht wurde. */
+function aboLeiste(m){
+  var l=lebendeAbos(), aktiv=l.filter(function(a){return a.aktiv;});
+  var imMonat=monthEntries('ausgaben',m).filter(function(e){return e.aboId;});
+  var summe=cent(add(imMonat.map(amountOf)));
+  return '<button class="abobar" onclick="A.openAbos()">'
+    +'<span class="chev">›</span>'
+    +'<span class="abobar-t">Laufende Kosten</span>'
+    +'<span class="abobar-s">'
+    +(l.length
+       ? nStk(aktiv.length,'Kostenstelle','Kostenstellen')+' aktiv'
+         +(imMonat.length
+            ? ' · in '+esc(mLong(m))+' gebucht: '+nStk(imMonat.length,'Posten','Posten')
+            : ' · in '+esc(mLong(m))+' noch nichts gebucht')
+       : 'Software-Abos, Versicherung und alles, was monatlich abgeht – einmal hinterlegen, dann bucht es sich selbst')
+    +'</span>'
+    +(summe?'<span class="abobar-v num">'+eur(summe)+'</span>':'')
+    +'</button>';
+}
+
 function monatHTML(a){
   var m=ui.month, es=monthEntries(a,m), h='';
+  if(a==='ausgaben') h+=aboLeiste(m);
   if(!es.length){
     h+='<div class="ledger"><div class="empty">Keine Einträge in '+mLong(m)+'.</div></div>';
   }else{
@@ -1570,7 +1591,7 @@ function monatHTML(a){
   });
   h+=monatChart(a);
   h+='<div class="ctr"><button class="linkbtn" onclick="A.openReport()">Monatsbericht als PDF sichern</button>'
-    +(a==='ausgaben'?' <button class="linkbtn" onclick="A.openAbos()">Laufende Kosten</button>':'')
+
     +'</div>';
   return h;
 }
@@ -1685,6 +1706,7 @@ function rowHTML(e){
         +'<span class="badge"><span class="dot '+STATUS_DOT[e.status]+'"></span>'+esc(e.status)+'</span>'
         +(storno?'':'<span class="badge"><span class="dot '+zahlDot(e)+'"></span>'+zahlStatus(e)+'</span>')
         +'<span class="badge"><span class="dot '+UEBERGABE_DOT[e.uebergabe]+'"></span>'+esc(e.uebergabe)+'</span>'
+        +(e.steuer===false?'<span class="badge"><span class="dot dot-muted"></span>nicht für die Steuer</span>':'')
         +'</span>'
         +'<span class="row-time num">'+(offenOf(e)?eur(offenOf(e))+' offen':'')+'</span></div>'
       : e.area==='ausgaben'
@@ -1692,6 +1714,7 @@ function rowHTML(e){
         +'<span class="badge"><span class="dot '+(e.beleg?'dot-good':'dot-red')+'"></span>'
         +(e.beleg?'Beleg vorhanden':'Beleg fehlt')+'</span>'
         +(e.aboId?'<span class="badge"><span class="dot dot-accent"></span>laufende Kosten</span>':'')
+        +(e.steuer===false?'<span class="badge"><span class="dot dot-muted"></span>nicht für die Steuer</span>':'')
         +'</span><span></span></div>'
       : '')
     +(e.notiz?'<div class="row-note">'+esc(e.notiz)+'</div>':'')
@@ -1762,6 +1785,7 @@ function sheetForm(){
     var belegAn = ui.draft.beleg!==undefined ? ui.draft.beleg==='1' : (e?!!e.beleg:false);
     b+='<div class="sw-row" onclick="A.toggleBeleg()"><span>Beleg / Rechnung vorhanden</span>'
       +'<span class="sw"><input type="checkbox" id="f-beleg" '+(belegAn?'checked':'')+' onclick="event.stopPropagation();A.toggleBeleg(this)"><i></i></span></div>';
+    b+=steuerZeile(e,'Diese Ausgabe in die Steuerübersicht aufnehmen');
     b+='<div class="calc" id="calc"></div>';
     b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Seriennummer, Verwendungszweck, Garantie …">'+esc(g('notiz','notiz'))+'</textarea></div>';
     var actsA='<div class="acts">'
@@ -1845,6 +1869,7 @@ function sheetForm(){
       +'<div class="f"><label>Anzahl Fotos</label><input type="number" inputmode="numeric" min="0" id="f-fotos" value="'+g('fotos','fotos')+'"></div></div>';
     b+='<div class="f"><label>Übermittlung der Fotos</label><select id="f-ueber">'
       +optionen(UEBERGABE,g('ueber','uebergabe',UEBERGABE[0]))+'</select></div>';
+    b+=steuerZeile(e,'Diesen Auftrag in die Steuerübersicht aufnehmen');
     /* Aus dem Auftrag direkt zur Rechnung – Kunde und Honorar stehen dann schon. */
     if(ui.editId){
       var rg=rgFuerAuftrag(ui.editId);
@@ -1905,7 +1930,7 @@ function sheetSettings(){
   b+='<div class="homelinks" style="margin-top:6px">'
     +'<button class="linkbtn" onclick="A.openAbos()">Laufende Kosten ('+lebendeAbos().length+')</button>'
     +'<button class="linkbtn" onclick="A.openFirma()">Meine Rechnungsangaben</button>'
-    +'<button class="linkbtn" onclick="A.openSteuer()">Steuerübersicht</button>'
+    +'<button class="linkbtn" onclick="A.openSteuer()">Einnahmen &amp; Ausgaben (Steuer)</button>'
     +'<button class="linkbtn" onclick="A.openTrash()">Papierkorb ('+(imPapier().length+rgPapier().length)+')</button>'
     +'<button class="linkbtn" onclick="A.openBackup()">Sicherung</button>'
     +'<button class="linkbtn" onclick="A.openPw()">Passwort ändern</button>'
@@ -2262,7 +2287,9 @@ function sheetRg(){
   b+='<div class="f"><label>Anrede</label>'
     +'<input type="text" id="rg-anrede" value="'+esc(r.anrede)+'"></div>';
   b+='<div class="f"><label>Einleitung</label><textarea id="rg-anschreiben">'+esc(r.anschreiben)+'</textarea></div>';
-  b+='<div class="f"><label>Schlusssatz</label><textarea id="rg-schluss">'+esc(r.schluss)+'</textarea></div>';
+  b+='<div class="f"><label>Schlusstext – frei schreibbar</label>'
+    +'<textarea id="rg-schluss" style="min-height:150px">'+esc(r.schluss)+'</textarea>'
+    +platzhalterHilfe()+'</div>';
   b+='<div class="f"><label>Interne Notiz (steht nicht auf der Rechnung)</label>'
     +'<textarea id="rg-notiz">'+esc(r.notiz)+'</textarea></div>';
 
@@ -2271,6 +2298,26 @@ function sheetRg(){
     +'<button class="btn btn-line" onclick="A.vorschauRg()">Vorschau</button>'
     +'<button class="btn btn-fill" onclick="A.saveRg()">Speichern</button></div>';
   return shell(ui.rgId?'Rechnung '+esc(r.nr):'Neue Rechnung',b,acts);
+}
+
+/* Das Häkchen, mit dem ein Eintrag aus der Steuerübersicht bleibt. */
+function steuerZeile(e,text){
+  var an = ui.draft.steuer!==undefined ? ui.draft.steuer==='1' : (e?e.steuer!==false:true);
+  return '<label class="check" style="margin-bottom:6px"><input type="checkbox" id="f-steuer" '
+    +(an?'checked':'')+'> '+esc(text)+'</label>'
+    +'<div class="hint" style="margin-top:-6px">Häkchen weg für Gefälligkeiten: der Eintrag bleibt mit '
+    +'seinem Wert im Buch, taucht in der Steuerübersicht aber nicht auf.</div>';
+}
+
+/* Unter dem Schlusstext: was die App an Platzhaltern einsetzt. Alles andere
+   am Text bestimmst du – es gibt keine fest eingebaute Grußformel mehr. */
+function platzhalterHilfe(){
+  return '<div class="hint" style="margin-top:6px">Alles hier ist frei – auch die Grußformel. '
+    +'Was du einsetzen kannst, füllt die App beim Drucken aus:<br>'
+    + RG_PLATZ.map(function(x){
+        return '<code>'+esc(x[0])+'</code> '+esc(x[1]);
+      }).join(' · ')
+    +'<br>Zeilenumbrüche bleiben so, wie du sie schreibst.</div>';
 }
 
 function rgPosHTML(p,i,n){
@@ -2356,7 +2403,9 @@ function sheetFirma(){
   b+='<div class="f"><label>Zahlungsziel (Tage)</label>'+zahlFeld('fi-ziel',f.zahlungsziel,'','14')+'</div>';
   b+='<div class="f"><label>Anrede</label><input type="text" id="fi-anrede" value="'+esc(f.anrede)+'"></div>';
   b+='<div class="f"><label>Einleitung</label><textarea id="fi-anschreiben">'+esc(f.anschreiben)+'</textarea></div>';
-  b+='<div class="f"><label>Schlusssatz</label><textarea id="fi-schluss">'+esc(f.schluss)+'</textarea></div>';
+  b+='<div class="f"><label>Schlusstext – frei schreibbar</label>'
+    +'<textarea id="fi-schluss" style="min-height:150px">'+esc(f.schluss)+'</textarea>'
+    +platzhalterHilfe()+'</div>';
 
   var acts='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
     +'<button class="btn btn-fill" onclick="A.saveFirma()">Speichern</button></div>';
@@ -2439,12 +2488,16 @@ function sheetReport(){
   var js=jahre(BEREICHE.indexOf(ui.repBereich)>=0?ui.repBereich:'self');
   if(!ui.repJahr||js.indexOf(ui.repJahr)<0) ui.repJahr=js[0];
   if(ui.repMonat==='') ui.repMonat=String(new Date().getMonth());
-  var b='<div class="hint">Bericht mit Kennzahlen, Diagrammen und der vollständigen Tabelle. '
-    +'In der Vorschau auf <b>Drucken</b> und im Druckdialog „Als PDF sichern“ wählen.</div>';
+  var b='<div class="hint">'
+    +(steuer
+      ? 'Eine Seite mit Einnahmen und Ausgaben je Monat – für die Steuerberatung. '
+        +'Einträge ohne Häkchen <i>„zählt für die Steuer“</i> bleiben außen vor.'
+      : 'Bericht mit Kennzahlen, Diagrammen und der vollständigen Tabelle.')
+    +' In der Vorschau auf <b>Drucken</b> und im Druckdialog „Als PDF sichern“ wählen.</div>';
   b+='<div class="f"><label>Bereich</label><select id="rp-bereich" onchange="A.repChange()">'
     +['self','martin','ausgaben','beide','steuer'].map(function(x){
       return '<option value="'+x+'"'+(ui.repBereich===x?' selected':'')+'>'
-        +(x==='beide'?'Alle Bereiche':x==='steuer'?'Steuerübersicht für ein Jahr':areaKurz(x))+'</option>';}).join('')
+        +(x==='beide'?'Alle Bereiche':x==='steuer'?'Einnahmen und Ausgaben je Monat (Steuer)':areaKurz(x))+'</option>';}).join('')
     +'</select></div>';
   if(steuer){
     b+='<div class="f"><label>Jahr</label><select id="rp-jahr" onchange="A.repChange()">'
@@ -2454,13 +2507,10 @@ function sheetReport(){
       +'<option value="zufluss"'+(ui.stBasis!=='leistung'?' selected':'')+'>nach Zufluss – wann das Geld kam (empfohlen)</option>'
       +'<option value="leistung"'+(ui.stBasis==='leistung'?' selected':'')+'>nach Leistungsdatum – wann gearbeitet wurde</option>'
       +'</select></div>';
-    b+='<div class="hint">Für die Einnahmen-Überschuss-Rechnung gilt das Zuflussprinzip: '
-      +'eine Einnahme zählt in dem Jahr, in dem das Geld eingegangen ist. Die zweite '
-      +'Betrachtung steht zum Vergleich daneben.</div>';
-    b+='<div class="btnrow"><button class="btn btn-line btn-sm" onclick="A.exportSteuerCSV()">Zahlen als CSV</button></div>';
+    b+='<div class="btnrow"><button class="btn btn-line btn-sm" onclick="A.exportSteuerCSV()">Als CSV laden</button></div>';
     var acts0='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
       +'<button class="btn btn-fill" onclick="A.zeigeSteuer()">Übersicht anzeigen</button></div>';
-    return shell('Steuerübersicht',b,acts0);
+    return shell('Einnahmen und Ausgaben',b,acts0);
   }
   b+='<div class="f"><label>Umfang</label><select id="rp-umfang" onchange="A.repChange()">'
     +[['monat','Einzelner Monat'],['jahr','Ganzes Jahr'],['alles','Alles (Gesamtarchiv)']].map(function(x){
@@ -2652,7 +2702,10 @@ function reportBlock(area,list,titel){
   return h;
 }
 
-/* ============ steuerübersicht ============ */
+/* ============ steuerübersicht ============
+   Kurz und knapp: Einnahmen und Ausgaben je Monat, sonst nichts. Genau das,
+   was die Steuerberatung braucht, um damit weiterzuarbeiten.
+   ================================================================== */
 
 function openSteuer(){
   ui.repBereich='steuer'; ui.repUmfang='jahr';
@@ -2660,214 +2713,87 @@ function openSteuer(){
   ui.sheet='report'; render();
 }
 
-/* Die Zuflüsse eines Jahres, Zeile für Zeile – das ist die Grundlage der
-   Einnahmen-Überschuss-Rechnung und lässt sich gegen den Kontoauszug halten. */
-function zuflussZeilen(y){
-  var out=[];
-  ['self','martin'].forEach(function(a){
-    areaEntries(a).forEach(function(e){
-      einnahmePosten(e).forEach(function(z){
-        if(z.datum.slice(0,4)!==y) return;
-        out.push({datum:z.datum, bereich:a, art:z.art, genau:z.genau, betrag:z.betrag,
-                  wer:a==='self'?(e.client||'—'):(e.name||e.was||'—'),
-                  was:e.was||(a==='self'?e.art:artLabel(e)), id:e.id});
-      });
-    });
-  });
-  return out.sort(function(x,y2){return x.datum.localeCompare(y2.datum);});
-}
-
 function steuerReportHTML(y,basis){
   var st=steuerJahr(y,basis);
-  var ku=kuLage(st);
-  var zufluss=basis==='zufluss';
-  var acc=areaHex('self');
+  var zufluss=basis!=='leistung';
 
   var h='<div class="rep-head"><div><h1>Auftragsbuch</h1>'
-    +'<div class="rep-sub">Steuerübersicht · Jahr '+esc(y)+' · '
-    +(zufluss?'Zuflussprinzip':'nach Leistungsdatum')+'</div></div>'
-    +'<div class="rep-meta">Erstellt am '+esc(stamp())+'<br>'
-    +'Gewinn '+eur(st.gewinn)+'<br>Vorbereitung für die Steuererklärung</div></div>';
+    +'<div class="rep-sub">Einnahmen und Ausgaben '+esc(y)+' · Selbstständigkeit</div></div>'
+    +'<div class="rep-meta">'+esc(settings.firma&&settings.firma.name?settings.firma.name:'')
+    +(settings.firma&&settings.firma.steuernr?'<br>Steuernummer '+esc(settings.firma.steuernr):'')
+    +'<br>Erstellt am '+esc(stamp())+'</div></div>';
 
-  h+='<div class="rep-sec"><h2>Einnahmen-Überschuss-Rechnung · Selbstständigkeit</h2><div class="rep-tiles">'
-    +repTile('Betriebseinnahmen',eur(st.einnahmen),zufluss?'im Jahr eingegangen':'im Jahr geleistet')
-    +repTile('Betriebsausgaben',eur(st.ausgaben),nStk(st.ausgListe.length,'Posten','Posten'))
-    +repTile('Gewinn',eur(st.gewinn),'Einnahmen minus Ausgaben')
-    +repTile('Ohne Beleg',eur(st.ohneBeleg),st.ohneBeleg?'Belege nachreichen':'alles belegt')
-    +repTile('Noch offen',eur(st.offen),'aus Aufträgen dieses Jahres')
-    +repTile('Bruttoarbeitslohn',eur(st.lohn),'Anstellung · Anlage N')
-    +'</div></div>';
+  h+='<div class="rep-sec"><table class="rep-table st-table"><thead><tr>'
+    +'<th>Monat</th><th class="rep-r">Einnahmen</th><th class="rep-r">Ausgaben</th>'
+    +'<th class="rep-r">Differenz</th></tr></thead><tbody>'
+    +st.monate.map(function(m,i){
+      var leer=!m.ein&&!m.aus;
+      return '<tr'+(leer?' class="st-leer"':'')+'><td>'+mName(i)+' '+esc(y)+'</td>'
+        +'<td class="rep-r">'+(m.ein?eur(m.ein):'—')+'</td>'
+        +'<td class="rep-r">'+(m.aus?eur(m.aus):'—')+'</td>'
+        +'<td class="rep-r">'+(leer?'—':eur(m.saldo))+'</td></tr>';
+    }).join('')
+    +'</tbody><tfoot>'
+    +'<tr><td>Summe '+esc(y)+'</td><td class="rep-r">'+eur(st.einnahmen)+'</td>'
+    +'<td class="rep-r">'+eur(st.ausgaben)+'</td>'
+    +'<td class="rep-r">'+eur(st.gewinn)+'</td></tr>'
+    +'</tfoot></table></div>';
 
-  h+='<div class="rep-sec"><h2>Wohin die Zahlen in der Steuererklärung gehören</h2>'
-    +'<table class="rep-table"><thead><tr><th>Betrag</th><th>Bezeichnung</th><th>Formular</th></tr></thead><tbody>'
-    +'<tr><td class="rep-r">'+eur(st.einnahmen)+'</td>'
-    +'<td>Betriebseinnahmen – umsatzsteuerfrei nach § 19 UStG</td>'
-    +'<td>Anlage EÜR, Abschnitt Betriebseinnahmen</td></tr>'
-    +'<tr><td class="rep-r">'+eur(st.ausgaben)+'</td><td>Betriebsausgaben (Aufteilung siehe unten)</td>'
-    +'<td>Anlage EÜR, Abschnitt Betriebsausgaben</td></tr>'
-    +'<tr><td class="rep-r">'+eur(st.gewinn)+'</td><td>Gewinn aus der selbstständigen Tätigkeit</td>'
-    +'<td>Anlage EÜR und Anlage S bzw. G</td></tr>'
-    +'<tr><td class="rep-r">'+eur(st.lohn)+'</td><td>Bruttoarbeitslohn aus der Anstellung</td>'
-    +'<td>Anlage N – maßgeblich ist die Lohnsteuerbescheinigung</td></tr>'
-    +'</tbody></table>'
-    +'<p class="rep-note">Die Zeilennummern der Formulare ändern sich von Jahr zu Jahr; deshalb '
-    +'steht hier der Abschnitt statt einer Zeile.</p></div>';
-
-  h+='<div class="rep-sec"><h2>Kleinunternehmerregelung nach § 19 UStG</h2>'
-    +'<table class="rep-table"><tbody>'
-    +'<tr><td>Vereinnahmter Umsatz '+esc(String(Number(y)-1))+' (Vorjahr)</td>'
-    +'<td class="rep-r">'+eur(st.umsatzVor)+'</td><td>Grenze '+eur0(st.grenzeVor)+'</td></tr>'
-    +'<tr><td>Vereinnahmter Umsatz '+esc(y)+'</td>'
-    +'<td class="rep-r">'+eur(st.umsatz)+'</td><td>Grenze '+eur0(st.grenzeLauf)+'</td></tr>'
-    +'</tbody></table>'
-    +'<p class="rep-note">'+esc(ku.text)+'</p></div>';
-
-  if(st.nachKat.length){
-    h+='<div class="rep-sec"><h2>Betriebsausgaben nach Kategorie</h2>'
-      +'<div class="rep-cols"><div><table class="rep-table"><thead><tr>'
-      +'<th>Kategorie</th><th class="rep-r">Posten</th><th class="rep-r">Betrag</th>'
-      +'<th class="rep-r">Anteil</th></tr></thead><tbody>'
-      +st.nachKat.slice().sort(function(a,b){return b.betrag-a.betrag;}).map(function(k){
-        return '<tr><td>'+esc(k.kat)+'</td><td class="rep-r">'+k.n+'</td>'
-          +'<td class="rep-r">'+eur(k.betrag)+'</td>'
-          +'<td class="rep-r">'+(st.ausgaben?Math.round(k.betrag/st.ausgaben*100):0)+' %</td></tr>';
-      }).join('')
-      +'</tbody><tfoot><tr><td>SUMME</td><td class="rep-r">'+st.ausgListe.length+'</td>'
-      +'<td class="rep-r">'+eur(st.ausgaben)+'</td><td></td></tr></tfoot></table></div>'
-      +'<div>'+rowChart(st.nachKat.map(function(k){
-          return {label:k.kat,value:k.betrag,tip:nStk(k.n,'Posten','Posten')};
-        }),{width:480,color:areaHex('ausgaben'),aria:'Betriebsausgaben nach Kategorie'})
-      +'</div></div></div>';
+  var notizen=[];
+  notizen.push('Einnahmen gezählt '+(zufluss
+    ? 'nach dem Zuflussprinzip – in dem Monat, in dem das Geld eingegangen ist.'
+    : 'nach dem Leistungsdatum – in dem Monat, in dem gearbeitet wurde.'));
+  notizen.push('Umsatzsteuerfrei nach § 19 UStG (Kleinunternehmerregelung). '
+    +'Vereinnahmter Umsatz '+esc(y)+': '+eur(st.umsatz)+' · Vorjahr: '+eur(st.umsatzVor)+'.');
+  if(st.lohn) notizen.push('Daneben Bruttoarbeitslohn aus der Anstellung: '+eur(st.lohn)
+    +' – gehört in die Anlage N, maßgeblich ist die Lohnsteuerbescheinigung.');
+  if(st.ausgenommenEin||st.ausgenommenAus){
+    notizen.push('Nicht enthalten, weil im Auftragsbuch nicht als steuerlich relevant angehakt: '
+      +(st.ausgenommenEin?eur(st.ausgenommenEin)+' an Einnahmen':'')
+      +(st.ausgenommenEin&&st.ausgenommenAus?' und ':'')
+      +(st.ausgenommenAus?eur(st.ausgenommenAus)+' an Ausgaben':'')+'.');
   }
+  if(zufluss&&st.ungenau) notizen.push('Bei '+eur(st.ungenau)+' ist kein Zahlungsdatum hinterlegt; '
+    +'dort steht ersatzweise das Datum des Auftrags.');
+  notizen.push('Zusammenstellung aus dem geführten Auftragsbuch, keine Steuerberatung.');
 
-  if(zufluss){
-    var zl=zuflussZeilen(y).filter(function(z){return z.bereich==='self';});
-    h+='<div class="rep-sec"><h2>Betriebseinnahmen · einzelne Zuflüsse</h2>';
-    h+= zl.length
-      ? '<table class="rep-table"><thead><tr><th>Datum</th><th>Kunde</th><th>Leistung</th>'
-        +'<th>Art</th><th>Datum belegt</th><th class="rep-r">Betrag</th></tr></thead><tbody>'
-        +zl.map(function(z){
-          return '<tr><td>'+dShort(z.datum)+'</td><td>'+esc(z.wer)+'</td><td>'+esc(z.was)+'</td>'
-            +'<td>'+esc(z.art)+'</td><td>'+(z.genau?'ja':'ersatzweise Auftragsdatum')+'</td>'
-            +'<td class="rep-r">'+eur(z.betrag)+'</td></tr>';
-        }).join('')
-        +'</tbody><tfoot><tr><td colspan="5">SUMME</td><td class="rep-r">'+eur(st.einnahmen)+'</td></tr></tfoot></table>'
-      : '<p class="rep-note">In diesem Jahr ist aus der Selbstständigkeit nichts eingegangen.</p>';
-    if(st.einnahmenUngenau)
-      h+='<p class="rep-note">Davon '+esc(eur(st.einnahmenUngenau))+' ohne hinterlegtes Zahlungsdatum – '
-        +'dort steht ersatzweise das Datum des Auftrags. Wenn es auf den Monat ankommt, '
-        +'trage das Zahlungsdatum beim Abrechnen nach.</p>';
-    h+='<p class="rep-note">Nach dem Leistungsdatum gerechnet wären es '+esc(eur(st.einnahmenAndere))+'.</p></div>';
-  }else{
-    var ll=yearEntries('self',y).filter(zaehlt);
-    h+='<div class="rep-sec"><h2>Betriebseinnahmen · Aufträge des Jahres</h2>';
-    h+= ll.length
-      ? '<table class="rep-table"><thead><tr><th>Datum</th><th>Kunde</th><th>Auftragsart</th>'
-        +'<th>Rechnungsnr.</th><th>Zahlung</th><th class="rep-r">Honorar</th></tr></thead><tbody>'
-        +ll.map(function(e){
-          return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.client||'')+'</td><td>'+esc(e.art)+'</td>'
-            +'<td>'+esc(e.rechnung||'')+'</td><td>'+esc(zahlStatus(e))+'</td>'
-            +'<td class="rep-r">'+eur(amountOf(e))+'</td></tr>';
-        }).join('')
-        +'</tbody><tfoot><tr><td colspan="5">SUMME</td><td class="rep-r">'+eur(st.einnahmen)+'</td></tr></tfoot></table>'
-      : '<p class="rep-note">In diesem Jahr wurde kein Auftrag erfasst.</p>';
-    h+='<p class="rep-note">Nach dem Zuflussprinzip gerechnet wären es '+esc(eur(st.einnahmenAndere))+'. '
-      +'Für die Einnahmen-Überschuss-Rechnung ist der Zufluss maßgeblich.</p></div>';
-  }
+  h+='<div class="rep-sec"><ul class="rep-liste">'
+    +notizen.map(function(n){return '<li>'+n+'</li>';}).join('')+'</ul></div>';
 
-  h+='<div class="rep-sec"><h2>Alle Betriebsausgaben des Jahres</h2>';
-  h+= st.ausgListe.length
-    ? '<table class="rep-table"><thead><tr><th>Datum</th><th>Bezeichnung</th><th>Kategorie</th>'
-      +'<th>Anbieter</th><th>Zahlungsart</th><th>Beleg</th><th>Herkunft</th>'
-      +'<th class="rep-r">Betrag</th></tr></thead><tbody>'
-      +st.ausgListe.map(function(e){
-        return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.bez||'')+'</td><td>'+esc(e.kat)+'</td>'
-          +'<td>'+esc(e.haendler||'')+'</td><td>'+esc(e.zahlart||'')+'</td>'
-          +'<td>'+(e.beleg?'✓':'fehlt')+'</td>'
-          +'<td>'+(e.aboId?'laufende Kosten':'einzeln erfasst')+'</td>'
-          +'<td class="rep-r">'+eur(amountOf(e))+'</td></tr>';
-      }).join('')
-      +'</tbody><tfoot><tr><td colspan="7">SUMME</td><td class="rep-r">'+eur(st.ausgaben)+'</td></tr></tfoot></table>'
-    : '<p class="rep-note">In diesem Jahr wurde keine Betriebsausgabe erfasst.</p>';
-  h+='</div>';
-
-  if(st.rg.length){
-    h+='<div class="rep-sec"><h2>Rechnungen des Jahres</h2><table class="rep-table"><thead><tr>'
-      +'<th>Nummer</th><th>Datum</th><th>Kunde</th><th>Leistungszeitpunkt</th><th>Status</th>'
-      +'<th class="rep-r">Betrag</th><th class="rep-r">Offen</th></tr></thead><tbody>'
-      +st.rg.slice().sort(function(a,b){return a.datum.localeCompare(b.datum);}).map(function(r){
-        return '<tr'+(r.status==='Storniert'?' style="color:#9A938A"':'')+'>'
-          +'<td>'+esc(r.nr)+'</td><td>'+dShort(r.datum)+'</td><td>'+esc(r.kunde.name||'')+'</td>'
-          +'<td>'+esc(rgLeistungText(r))+'</td><td>'+esc(r.status)+'</td>'
-          +'<td class="rep-r">'+eur(rgSumme(r))+'</td>'
-          +'<td class="rep-r">'+(rgOffen(r)?eur(rgOffen(r)):'—')+'</td></tr>';
-      }).join('')
-      +'</tbody><tfoot><tr><td colspan="5">SUMME (ohne Stornos)</td>'
-      +'<td class="rep-r">'+eur(st.rgSum.brutto)+'</td>'
-      +'<td class="rep-r">'+eur(st.rgSum.offen)+'</td></tr></tfoot></table>'
-      +'<p class="rep-note">Die Rechnungsnummern sollten lückenlos aufeinander folgen. '
-      +'Eine Rechnung, die nicht gilt, wird storniert statt gelöscht.</p></div>';
-  }
-
-  var lohnListe=yearEntries('martin',y);
-  if(lohnListe.length){
-    h+='<div class="rep-sec"><h2>Anstellung · Anlage N</h2><div class="rep-tiles">'
-      +repTile('Bruttoarbeitslohn',eur(st.lohn),zufluss?'im Jahr zugeflossen':'im Jahr gearbeitet')
-      +repTile('Zeilen',String(lohnListe.length),'erfasste Einträge')
-      +repTile('Gefahrene km',dec2(add(lohnListe.map(kmOf)))+' km','für das Fahrtgeld')
-      +'</div><p class="rep-note">Für die Anlage N zählt die Lohnsteuerbescheinigung des Arbeitgebers. '
-      +'Diese Summe dient dem Abgleich – weicht sie ab, klärt sich das meist über den '
-      +'Zahlungszeitpunkt am Jahreswechsel.</p></div>';
-  }
-
-  h+='<div class="rep-sec"><h2>Was noch zu tun ist</h2><ul class="rep-liste">'
-    +(st.ohneBeleg?'<li>Belege über '+esc(eur(st.ohneBeleg))+' nachreichen und abheften.</li>':'')
-    +(st.offen?'<li>'+esc(eur(st.offen))+' aus Aufträgen dieses Jahres sind noch offen – erst der Eingang zählt als Einnahme.</li>':'')
-    +(st.rgSum.ueberfaellig?'<li>'+esc(eur(st.rgSum.ueberfaellig))+' an Rechnungen sind überfällig.</li>':'')
-    +(st.einnahmenUngenau?'<li>Bei '+esc(eur(st.einnahmenUngenau))+' fehlt das Zahlungsdatum.</li>':'')
-    +(firmaLuecken().length?'<li>Eigene Rechnungsangaben ergänzen: '+esc(firmaLuecken().join(', '))+'.</li>':'')
-    +'<li>Aufbewahrungsfrist beachten: Belege und Aufzeichnungen gehören zehn Jahre aufgehoben.</li>'
-    +'</ul></div>';
-
-  h+='<div class="rep-sec"><h2>Hinweis</h2><p class="rep-note">'
-    +'Diese Übersicht fasst zusammen, was in diesem Auftragsbuch erfasst ist. Sie ist keine '
-    +'Steuerberatung und ersetzt weder die Steuererklärung noch die Prüfung durch eine '
-    +'steuerberatende Person. Ob ein Posten abziehbar ist und in welchem Jahr er zählt, '
-    +'entscheidet der Einzelfall.</p></div>';
-
-  h+='<div class="rep-foot"><span>Auftragsbuch · Steuerübersicht '+esc(y)+'</span>'
+  h+='<div class="rep-foot"><span>Auftragsbuch · Einnahmen und Ausgaben '+esc(y)+'</span>'
     +'<span>Erstellt am '+esc(stamp())+'</span></div>';
   return h;
 }
 
-/* Die Zahlen als Tabelle – zum Weiterreichen an die Steuerberatung. */
+/* Dieselben Zahlen als Tabelle, dahinter die einzelnen Zeilen – damit die
+   Steuerberatung bei Bedarf nachsehen kann, woraus ein Monat besteht. */
 function exportSteuerCSV(){
   var y=ui.repJahr||curY(), st=steuerJahr(y,ui.stBasis);
   var q=function(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';};
   var z=[];
-  z.push(['Abschnitt','Bezeichnung','Betrag'].map(q).join(';'));
-  z.push(['Übersicht','Betriebseinnahmen '+y,dec2(st.einnahmen)].map(q).join(';'));
-  z.push(['Übersicht','Betriebsausgaben '+y,dec2(st.ausgaben)].map(q).join(';'));
-  z.push(['Übersicht','Gewinn '+y,dec2(st.gewinn)].map(q).join(';'));
-  z.push(['Übersicht','Bruttoarbeitslohn '+y,dec2(st.lohn)].map(q).join(';'));
-  z.push(['§ 19 UStG','Vereinnahmter Umsatz '+(Number(y)-1),dec2(st.umsatzVor)].map(q).join(';'));
-  z.push(['§ 19 UStG','Vereinnahmter Umsatz '+y,dec2(st.umsatz)].map(q).join(';'));
-  st.nachKat.forEach(function(k){
-    z.push(['Betriebsausgaben',k.kat,dec2(k.betrag)].map(q).join(';'));
+  z.push(['Monat','Einnahmen','Ausgaben','Differenz'].map(q).join(';'));
+  st.monate.forEach(function(m,i){
+    z.push([mName(i)+' '+y, dec2(m.ein), dec2(m.aus), dec2(m.saldo)].map(q).join(';'));
+  });
+  z.push(['Summe '+y, dec2(st.einnahmen), dec2(st.ausgaben), dec2(st.gewinn)].map(q).join(';'));
+  z.push('');
+  z.push(['Einnahmen im Einzelnen','Datum','Kunde','Leistung','Art','Zahlungsdatum belegt','Betrag'].map(q).join(';'));
+  areaEntries('self').forEach(function(e){
+    if(!zaehlt(e)||!steuerZaehlt(e)) return;
+    einnahmePosten(e).forEach(function(p){
+      if(p.datum.slice(0,4)!==y) return;
+      z.push(['',dLang(p.datum),e.client||'',e.was||e.art||'',p.art,p.genau?'ja':'nein',dec2(p.betrag)]
+        .map(q).join(';'));
+    });
   });
   z.push('');
-  z.push(['Einnahmen · Zufluss','Datum','Bereich','Kunde','Leistung','Art','Datum belegt','Betrag'].map(q).join(';'));
-  zuflussZeilen(y).forEach(function(x){
-    z.push(['',dLang(x.datum),areaKurz(x.bereich),x.wer,x.was,x.art,x.genau?'ja':'nein',dec2(x.betrag)]
+  z.push(['Ausgaben im Einzelnen','Datum','Bezeichnung','Kategorie','Anbieter','Zahlungsart','Beleg','Betrag'].map(q).join(';'));
+  yearEntries('ausgaben',y).forEach(function(e){
+    if(!steuerZaehlt(e)) return;
+    z.push(['',dLang(e.date),e.bez||'',e.kat,e.haendler||'',e.zahlart||'',e.beleg?'ja':'nein',dec2(amountOf(e))]
       .map(q).join(';'));
   });
-  z.push('');
-  z.push(['Betriebsausgaben','Datum','Bezeichnung','Kategorie','Anbieter','Zahlungsart','Beleg','Herkunft','Betrag'].map(q).join(';'));
-  st.ausgListe.forEach(function(e){
-    z.push(['',dLang(e.date),e.bez||'',e.kat,e.haendler||'',e.zahlart||'',e.beleg?'ja':'nein',
-            e.aboId?'laufende Kosten':'einzeln',dec2(amountOf(e))].map(q).join(';'));
-  });
-  download('Auftragsbuch-Steuer-'+y+'.csv','﻿'+z.join('\r\n'),'text/csv;charset=utf-8');
+  download('Auftragsbuch-Einnahmen-Ausgaben-'+y+'.csv','﻿'+z.join('\r\n'),'text/csv;charset=utf-8');
 }
 
 function zeigeSteuer(){
@@ -2877,7 +2803,7 @@ function zeigeSteuer(){
   document.getElementById('report').innerHTML=steuerReportHTML(y,ui.stBasis);
   document.getElementById('report').classList.remove('rechnung');
   seitenFormat('quer');
-  document.getElementById('reportbar-t').textContent='Vorschau · Steuerübersicht '+y;
+  document.getElementById('reportbar-t').textContent='Vorschau · Einnahmen und Ausgaben '+y;
   ui.sheet=null; ui.repOffen=true;
   document.body.classList.add('report-open');
   document.getElementById('report').hidden=false;
@@ -2995,27 +2921,59 @@ function showReport(){
 function seitenFormat(f){
   var el=document.getElementById('pageformat');
   if(!el){ el=document.createElement('style'); el.id='pageformat'; document.head.appendChild(el); }
+  /* Hochkant setzt die App die Seiten selbst, deshalb Rand 0: der Browser
+     hat dann keinen Platz mehr für seine eigene Kopf- und Fußzeile mit der
+     Web-Adresse. Die Seitenzahl steht im Dokument. */
   el.textContent = f==='hoch'
-    ? '@media print{@page{size:A4 portrait;margin:16mm 18mm 14mm;}}'
+    ? '@media print{@page{size:A4 portrait;margin:0;}}'
     : '@media print{@page{size:A4 landscape;margin:11mm;}}';
 }
 
 function zeile(x){ return x?esc(x)+'<br>':''; }
 
-function rechnungHTML(r){
+/* Platzhalter im Schlusstext. Der Text selbst gehört dir – die App setzt
+   nur ein, was sie ohnehin weiß. */
+var RG_PLATZ=[
+  ['{betrag}',     'zu zahlender Betrag'],
+  ['{summe}',      'Summe der Leistungen'],
+  ['{anzahlung}',  'bereits gezahlte Anzahlung'],
+  ['{faellig}',    'Zahlungsziel als Datum'],
+  ['{nummer}',     'Rechnungsnummer'],
+  ['{datum}',      'Rechnungsdatum'],
+  ['{kunde}',      'Name des Kunden'],
+  ['{name}',       'dein Name'],
+  ['{kontoinhaber}','Kontoinhaber'],
+  ['{iban}',       'IBAN'],
+  ['{bic}',        'BIC'],
+  ['{bank}',       'Bank']
+];
+function rgWerte(r){
+  var f=Object.assign({},DEF_FIRMA,settings.firma||{});
+  var sum=rgSumme(r), anz=cent(Number(r.anzahlung)||0);
+  return {
+    '{betrag}':eur(cent(sum-anz)), '{summe}':eur(sum), '{anzahlung}':eur(anz),
+    '{faellig}':dLang(rgFaellig(r)), '{nummer}':r.nr||'', '{datum}':dLang(r.datum),
+    '{kunde}':r.kunde.name||'', '{name}':f.name||'',
+    '{kontoinhaber}':f.kontoinhaber||'', '{iban}':f.iban||'', '{bic}':f.bic||'', '{bank}':f.bank||''
+  };
+}
+function rgText(t,r){
+  var w=rgWerte(r);
+  return String(t||'').replace(/\{[a-zäöüß]+\}/g,function(m){ return w[m]!==undefined?w[m]:m; });
+}
+
+/* Die einzelnen Bausteine der Rechnung. Die Positionstabelle darf über
+   Seiten laufen, alles andere bleibt zusammen. */
+function rechnungBloecke(r){
   var f=Object.assign({},DEF_FIRMA,settings.firma||{});
   var sum=rgSumme(r), anz=cent(Number(r.anzahlung)||0), zahlbar=cent(sum-anz);
-  var absender=[f.name,f.zusatz,f.strasse,(f.plz+' '+f.ort).trim()].filter(Boolean).join(' · ');
-  var faellig=rgFaellig(r);
-  var luecken=rgLuecken(r);
+  /* Telefon und E-Mail stehen jetzt oben in der Absenderzeile – unten
+     auf der Rechnung steht nichts mehr außer der Seitenzahl. */
+  var absender=[f.name,f.zusatz,f.strasse,(f.plz+' '+f.ort).trim(),f.telefon,f.email]
+    .filter(Boolean).join(' · ');
 
-  var h='';
-  if(luecken.length){
-    h+='<div class="rg-warn">Diese Rechnung ist noch nicht vollständig. Es fehlt: '
-      +esc(luecken.join(', '))+'. Der Hinweis erscheint nur am Bildschirm, nicht im Druck.</div>';
-  }
-  h+='<div class="rg-abs">'+esc(absender||'— eigene Angaben fehlen —')+'</div>';
-  h+='<div class="rg-kopf"><div class="rg-adr">'
+  var kopf='<div class="rg-abs">'+esc(absender||'— eigene Angaben fehlen —')+'</div>'
+    +'<div class="rg-kopf"><div class="rg-adr">'
     + zeile(r.kunde.name) + zeile(r.kunde.zusatz) + zeile(r.kunde.strasse)
     + zeile((r.kunde.plz+' '+r.kunde.ort).trim())
     +'</div><table class="rg-daten"><tbody>'
@@ -3024,47 +2982,91 @@ function rechnungHTML(r){
     +'<tr><td>Leistungszeitpunkt</td><td>'+esc(rgLeistungText(r))+'</td></tr>'
     +(f.steuernr?'<tr><td>Steuernummer</td><td>'+esc(f.steuernr)+'</td></tr>':'')
     +(f.ustid?'<tr><td>USt-IdNr.</td><td>'+esc(f.ustid)+'</td></tr>':'')
-    +'</tbody></table></div>';
+    +'</tbody></table></div>'
+    +'<h1 class="rg-titel">Rechnung'+(r.nr?' Nr. '+esc(r.nr):'')+'</h1>'
+    +(r.status==='Storniert'?'<p class="rg-storno">Diese Rechnung wurde storniert.</p>':'')
+    +(r.anrede?'<p class="rg-p">'+esc(rgText(r.anrede,r))+'</p>':'')
+    +(r.anschreiben?'<p class="rg-p">'+esc(rgText(r.anschreiben,r))+'</p>':'');
 
-  h+='<h1 class="rg-titel">Rechnung'+(r.nr?' Nr. '+esc(r.nr):'')+'</h1>';
-  if(r.status==='Storniert') h+='<p class="rg-storno">Diese Rechnung wurde storniert.</p>';
-  if(r.anrede) h+='<p class="rg-p">'+esc(r.anrede)+'</p>';
-  if(r.anschreiben) h+='<p class="rg-p">'+esc(r.anschreiben)+'</p>';
+  var zeilen=r.posten.filter(function(p){return p.text||postenSumme(p);}).map(function(p,i){
+    return '<tr><td>'+(i+1)+'</td><td>'+esc(p.text||'—')+'</td>'
+      +'<td class="rep-r">'+dec2(p.menge)+(p.einheit?' '+esc(p.einheit):'')+'</td>'
+      +'<td class="rep-r">'+eur(p.einzel)+'</td>'
+      +'<td class="rep-r">'+eur(postenSumme(p))+'</td></tr>';
+  });
 
-  h+='<table class="rg-pos"><thead><tr><th>Pos.</th><th>Art und Umfang der Leistung</th>'
-    +'<th class="rep-r">Menge</th><th class="rep-r">Einzelpreis</th><th class="rep-r">Betrag</th></tr></thead><tbody>'
-    +r.posten.filter(function(p){return p.text||postenSumme(p);}).map(function(p,i){
-      return '<tr><td>'+(i+1)+'</td><td>'+esc(p.text||'—')+'</td>'
-        +'<td class="rep-r">'+dec2(p.menge)+(p.einheit?' '+esc(p.einheit):'')+'</td>'
-        +'<td class="rep-r">'+eur(p.einzel)+'</td>'
-        +'<td class="rep-r">'+eur(postenSumme(p))+'</td></tr>';
-    }).join('')
-    +'</tbody></table>';
-
-  h+='<table class="rg-summen"><tbody>'
+  var schluss='<table class="rg-summen"><tbody>'
     +(anz?'<tr><td>Summe der Leistungen</td><td class="rep-r">'+eur(sum)+'</td></tr>'
          +'<tr><td>abzüglich bereits gezahlter Anzahlung</td><td class="rep-r">− '+eur(anz)+'</td></tr>':'')
     +'<tr class="rg-gesamt"><td>'+(anz?'Noch zu zahlen':'Rechnungsbetrag')+'</td>'
     +'<td class="rep-r">'+eur(anz?zahlbar:sum)+'</td></tr>'
-    +'</tbody></table>';
+    +'</tbody></table>'
+    +(r.kleinunternehmer?'<p class="rg-19">'+esc(UST19_HINWEIS)+'</p>':'')
+    +(r.schluss?'<div class="rg-schluss">'+esc(rgText(r.schluss,r))+'</div>':'');
 
-  if(r.kleinunternehmer) h+='<p class="rg-19">'+esc(UST19_HINWEIS)+'</p>';
+  return [
+    {html:kopf},
+    {auf:'<table class="rg-pos"><thead><tr><th>Pos.</th><th>Art und Umfang der Leistung</th>'
+        +'<th class="rep-r">Menge</th><th class="rep-r">Einzelpreis</th><th class="rep-r">Betrag</th>'
+        +'</tr></thead><tbody>',
+     zu:'</tbody></table>', rows:zeilen},
+    {html:schluss}
+  ];
+}
 
-  var bank=[f.kontoinhaber?'Kontoinhaber '+f.kontoinhaber:'',f.iban?'IBAN '+f.iban:'',
-            f.bic?'BIC '+f.bic:'',f.bank].filter(Boolean).join(' · ');
-  h+='<p class="rg-p">'+(r.status==='Bezahlt'&&r.bezahltAm
-      ? 'Der Betrag ist am '+dLang(r.bezahltAm)+' eingegangen. Vielen Dank.'
-      : 'Bitte überweisen Sie den Betrag ohne Abzug bis zum <b>'+dLang(faellig)+'</b>'
-        +(bank?' auf folgendes Konto: '+esc(bank):'')+'.')+'</p>';
-  if(r.schluss) h+='<p class="rg-p">'+esc(r.schluss)+'</p>';
-  h+='<p class="rg-p rg-gruss">Mit freundlichen Grüßen<br><br>'+esc(f.name)+'</p>';
+/* Die Rechnung auf DIN-A4-Seiten verteilen. Der Browser kann von sich aus
+   keine Seitenzahlen in ein Dokument schreiben – CSS Paged Media beherrscht
+   er nicht. Also setzt die App die Seiten selbst und nummeriert sie. Dadurch
+   darf der Seitenrand im Druck auf 0 stehen, und der Browser druckt weder
+   die Web-Adresse noch sonst etwas an den Rand. */
+function rgSeiten(bloecke){
+  var buehne=document.createElement('div');
+  buehne.className='report rechnung rg-buehne';
+  buehne.innerHTML='<div class="rg-seite"><div class="rg-body"></div>'
+    +'<div class="rg-seitenzahl">Seite 1 von 1</div></div>';
+  document.body.appendChild(buehne);
+  var body=buehne.querySelector('.rg-body');
+  var maxH=body.clientHeight;
+  var seiten=[], akt=[];
+  var passt=function(zusatz){
+    body.innerHTML=akt.join('')+zusatz;
+    return body.scrollHeight<=maxH;
+  };
+  var umbruch=function(){ if(akt.length){ seiten.push(akt.join('')); akt=[]; } };
 
-  h+='<div class="rg-fuss">'
-    +'<div>'+zeile(f.name)+zeile(f.zusatz)+zeile(f.strasse)+zeile((f.plz+' '+f.ort).trim())+'</div>'
-    +'<div>'+zeile(f.telefon)+zeile(f.email)+zeile(f.web)+'</div>'
-    +'<div>'+(f.steuernr?'Steuernummer '+esc(f.steuernr)+'<br>':'')
-    +(f.ustid?'USt-IdNr. '+esc(f.ustid)+'<br>':'')
-    +(f.iban?esc(f.iban)+'<br>':'')+(f.bank?esc(f.bank):'')+'</div></div>';
+  bloecke.forEach(function(bl){
+    if(bl.rows){
+      var teil=[];
+      bl.rows.forEach(function(zl){
+        if(passt(bl.auf+teil.concat([zl]).join('')+bl.zu)){ teil.push(zl); return; }
+        if(teil.length) akt.push(bl.auf+teil.join('')+bl.zu);
+        umbruch();
+        teil=[zl];
+      });
+      if(teil.length) akt.push(bl.auf+teil.join('')+bl.zu);
+    }else{
+      if(akt.length && !passt(bl.html)) umbruch();
+      akt.push(bl.html);
+    }
+  });
+  umbruch();
+  buehne.remove();
+  return seiten.length?seiten:[''];
+}
+
+function rechnungHTML(r){
+  var luecken=rgLuecken(r);
+  var seiten=rgSeiten(rechnungBloecke(r));
+  var h='';
+  if(luecken.length){
+    h+='<div class="rg-warn">Diese Rechnung ist noch nicht vollständig. Es fehlt: '
+      +esc(luecken.join(', '))+'. Der Hinweis erscheint nur am Bildschirm, nicht im Druck.</div>';
+  }
+  h+=seiten.map(function(inhalt,i){
+    return '<div class="rg-seite'+(i===seiten.length-1?' letzte':'')+'">'
+      +'<div class="rg-body">'+inhalt+'</div>'
+      +'<div class="rg-seitenzahl">Seite '+(i+1)+' von '+seiten.length+'</div></div>';
+  }).join('');
   return h;
 }
 

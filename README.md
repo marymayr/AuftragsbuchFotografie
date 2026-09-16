@@ -20,8 +20,8 @@ rechts; auf dem Handy stapeln sich die Gruppen untereinander.
 
 Läuft vollständig im Browser: kein Server, kein Konto, keine Cloud. Alle Daten
 liegen verschlüsselt auf dem Gerät. Monats-, Jahres- und Gesamtberichte lassen
-sich jederzeit als PDF herausziehen, ebenso die **Steuerübersicht** mit der
-Einnahmen-Überschuss-Rechnung für die Einkommensteuer.
+sich jederzeit als PDF herausziehen, ebenso eine knappe Übersicht über
+**Einnahmen und Ausgaben je Monat** für die Steuerberatung.
 
 **Beträge werden auf den Cent genau erfasst.** In jedes Geldfeld darfst du
 `5,49` oder `5.49` schreiben, auch `1.234,56` – die App versteht beides und
@@ -137,6 +137,12 @@ Fotos noch rausmüssen.
 - Ausgaben werden **nicht** mehr je Auftrag erfasst – dafür gibt es den eigenen
   Bereich *Betriebsausgaben*.
 
+Unten im Auftrag steht das Häkchen **„Diesen Auftrag in die Steuerübersicht
+aufnehmen"**. Nimm es weg für Gefälligkeiten – wenn du für Freunde fotografierst
+und nur einen Wert notierst, aber nichts verlangst. Der Auftrag bleibt mit
+seinem Betrag im Buch und in allen Auswertungen; nur aus der Steuerübersicht
+bleibt er draußen und trägt in der Liste die Marke *„nicht für die Steuer"*.
+
 Im geöffneten Auftrag steht **„Rechnung zu diesem Auftrag schreiben"**. Kunde,
 Leistung, Honorar und Anzahlung sind dann schon eingetragen, und die vergebene
 Rechnungsnummer landet anschließend von selbst im Feld *Rechnungsnr.* des
@@ -192,6 +198,7 @@ Fahrzeit und der Standard-Stundensatz für eigene Aufträge.
 | Zahlungsart | Bankkarte · Bar · Überweisung · PayPal · Rechnung · Sonstiges |
 | Händler / Anbieter | mit Vorschlägen aus bisherigen Einkäufen |
 | Beleg / Rechnung vorhanden | Schalter |
+| In die Steuerübersicht aufnehmen | Häkchen, voreingestellt gesetzt |
 | Notiz | Seriennummer, Verwendungszweck, Garantie … |
 
 Die Jahresansicht zeigt Summe, Durchschnitt, größten Posten und – wichtig für
@@ -208,8 +215,14 @@ Für alles, was jeden Monat von selbst abgeht: Software-Abos, Cloud-Speicher,
 Versicherung. Einmal hinterlegt, bucht die App den Posten in **jedem fälligen
 Monat** selbst in die Betriebsausgaben.
 
-Zu erreichen über *Startseite → Laufende Kosten*, über *Sätze & Einstellungen*
-oder unten in der Ausgabenansicht.
+Zu finden sind sie dort, wo sie hingehören: **oben in den Betriebsausgaben**.
+Über der Monatsliste steht eine Leiste mit den aktiven Kostenstellen und dem,
+was in diesem Monat davon gebucht wurde; in der Kopfzeile liegt zusätzlich das
+Zeichen **↻**. (Auch unter *Sätze & Einstellungen* erreichbar.)
+
+Die gebuchten Posten sind ganz normale Betriebsausgaben: Sie stehen in der
+Monatsliste, zählen in die Monats- und Jahressummen, in die Berichte und in
+die Steuerübersicht.
 
 | Feld | Wofür |
 |---|---|
@@ -306,6 +319,45 @@ Einzelpreis. Menge und Preis dürfen Nachkommastellen haben – `6,5 Std × 45,5
 ergibt 295,75 €. Eine bereits gezahlte **Anzahlung** wird unten abgezogen, auf
 der Rechnung steht dann *„Noch zu zahlen"*.
 
+### Der Schlusstext gehört dir
+
+Unter der Positionstabelle steht **ein einziges freies Textfeld**. Es gibt keine
+fest eingebaute Grußformel und keinen fest eingebauten Zahlungssatz – alles
+darin schreibst du selbst, mit deinen Zeilenumbrüchen. Voreingestellt ist nur
+ein **Vorschlag**, den du in *Meine Rechnungsangaben* für künftige Rechnungen
+änderst und je Rechnung überschreiben kannst.
+
+Damit Beträge und Daten trotzdem stimmen, setzt die App beim Drucken ein paar
+Platzhalter ein:
+
+`{betrag}` · `{summe}` · `{anzahlung}` · `{faellig}` · `{nummer}` · `{datum}` ·
+`{kunde}` · `{name}` · `{kontoinhaber}` · `{iban}` · `{bic}` · `{bank}`
+
+Der Vorschlag lautet:
+
+```
+Bitte überweisen Sie den Betrag von {betrag} ohne Abzug bis zum {faellig} auf folgendes Konto:
+{kontoinhaber} · IBAN {iban} · {bank}
+
+Herzlichen Dank für Ihr Vertrauen.
+
+Mit freundlichen Grüßen
+{name}
+```
+
+Wer ihn nicht mag, löscht ihn und schreibt etwas anderes. Auch Anrede und
+Einleitung sind freie Felder.
+
+### Was oben steht, was unten steht
+
+- **Oben** in der Absenderzeile: Name, Zusatz, Anschrift und – seit Fassung
+  v13 – **Telefon und E-Mail**.
+- **Rechts im Kopf**: Rechnungsnummer, Rechnungsdatum, Leistungszeitpunkt und
+  die Steuernummer.
+- **Unten**: nur noch die **Seitenzahl**, etwa *Seite 1 von 2*. Der frühere
+  Block mit Anschrift, Kontakt und Bankverbindung ist weg; die Bankverbindung
+  steht im Schlusstext, wo sie hingehört.
+
 ### Status und PDF
 
 **Entwurf · Gestellt · Bezahlt · Storniert.** Das Kästchen links in der Liste
@@ -317,52 +369,63 @@ Das **▤** rechts in der Zeile (oder *Vorschau* im Formular) öffnet den fertig
 Bogen. Von dort *Drucken / als PDF sichern* – die Rechnung wird **A4 hoch**
 gedruckt, die Berichte weiterhin quer.
 
+**Keine Web-Adresse auf dem Papier.** Die App setzt die Seiten selbst und
+schreibt die Seitenzahl ins Dokument. Dadurch kann der Seitenrand im Druck auf
+null stehen, und der Browser hat keinen Platz mehr für seine eigene Kopf- und
+Fußzeile mit `github.io`, Datum und Uhrzeit. Sollte dein Browser sie dennoch
+anzeigen, schalte im Druckdialog **„Kopf- und Fußzeilen“** ab – die Seitenzahl
+der App bleibt davon unberührt.
+
 ---
 
-## 6c. Steuerübersicht für die Einkommensteuer
+## 6c. Einnahmen und Ausgaben für die Steuer
 
-*Startseite → Steuern & EÜR* oder *Bericht & PDF → Steuerübersicht für ein Jahr*.
+*Startseite → Einnahmen & Ausgaben* oder *Bericht & PDF → Einnahmen und Ausgaben
+je Monat (Steuer)*.
 
-Ein Jahresbogen, der zusammenstellt, was für die Steuererklärung gebraucht wird:
+Bewusst knapp gehalten – eine Seite, die du der Steuerberatung geben kannst:
 
-- **Einnahmen-Überschuss-Rechnung**: Betriebseinnahmen, Betriebsausgaben, Gewinn.
-- **Wohin die Zahlen gehören**: Anlage EÜR, Anlage S bzw. G, Anlage N. Genannt
-  wird der Abschnitt, nicht die Zeilennummer – die ändert sich jedes Jahr.
-- **Kleinunternehmerregelung**: der vereinnahmte Umsatz des Vorjahres und des
-  laufenden Jahres gegen die Grenzen nach § 19 UStG, mit Urteil im Klartext.
-  Die Grenzen (Stand 2025: 25.000 € / 100.000 €) stehen in *Meine
-  Rechnungsangaben* und lassen sich nachziehen, wenn der Gesetzgeber sie ändert.
-- **Betriebsausgaben nach Kategorie**, als Tabelle mit Anteilen und als Diagramm.
-- **Jeder einzelne Zufluss** und **jede einzelne Ausgabe** des Jahres, zum
-  Abgleich mit dem Kontoauszug. Bei den Ausgaben steht dabei, ob sie einzeln
-  erfasst oder aus den laufenden Kosten gebucht wurden.
-- **Rechnungen des Jahres** mit Status und offenen Beträgen.
-- **Was noch zu tun ist**: fehlende Belege, offene Forderungen, überfällige
-  Rechnungen, fehlende Zahlungsdaten.
+| Monat | Einnahmen | Ausgaben | Differenz |
+|---|---|---|---|
+| Januar 2026 | … | … | … |
+| … | | | |
+| **Summe 2026** | | | |
+
+Darunter stehen vier, fünf Zeilen Kleingedrucktes: wie gezählt wurde, der
+vereinnahmte Umsatz für § 19 UStG, der Bruttoarbeitslohn aus der Anstellung
+(der gehört in die Anlage N), was nicht mitgezählt wurde – und der Hinweis,
+dass das keine Steuerberatung ist. Mehr nicht.
+
+Dieselben Zahlen gibt es als **CSV**; dort stehen hinter der Monatstabelle
+zusätzlich die einzelnen Einnahmen und Ausgaben, falls jemand nachsehen will,
+woraus ein Monat besteht.
+
+### Was mitzählt und was nicht
+
+In jedem Auftrag und jeder Ausgabe steht das Häkchen **„in die Steuerübersicht
+aufnehmen"**, voreingestellt gesetzt. Nimm es weg, wo du etwas nur der Ordnung
+halber erfasst – etwa ein Shooting für Freunde, bei dem du einen Wert notierst,
+aber nichts verlangst.
+
+Solche Einträge bleiben mit ihrem Betrag im Buch, in den Monats- und
+Jahreszahlen und in den Berichten. Nur in der Steuerübersicht fehlen sie; unter
+der Tabelle steht dann, wie viel auf diese Weise draußen geblieben ist. In der
+Liste tragen sie die Marke *„nicht für die Steuer"*.
 
 ### Zufluss oder Leistung
 
-Für die Einnahmen-Überschuss-Rechnung gilt das **Zuflussprinzip**: eine Einnahme
-zählt in dem Jahr, in dem das Geld da war. Genau so rechnet die Übersicht in der
-Voreinstellung.
+Voreingestellt zählt eine Einnahme in dem Monat, in dem das **Geld eingegangen**
+ist – so verlangt es die Einnahmen-Überschuss-Rechnung.
 
-- Eine **Anzahlung** zählt zum Datum des Auftrags – ein eigenes Datum wird dafür
+- Eine **Anzahlung** zählt zum Datum des Auftrags; ein eigenes Datum wird dafür
   nicht erfasst.
 - Ein **abgerechneter Auftrag** zählt zum Zahlungsdatum aus der Abrechnung.
-  Fehlt es, nimmt die App ersatzweise das Auftragsdatum und **weist die Summe
-  gesondert aus**. Wenn es auf den Monat ankommt, trage das Zahlungsdatum beim
-  Abrechnen nach.
+  Fehlt es, nimmt die App ersatzweise das Auftragsdatum und schreibt unter die
+  Tabelle, um wie viel es dabei geht.
 - **Ausgaben** sind ohnehin mit ihrem Zahlungsdatum erfasst.
 
-Zum Vergleich lässt sich auf *nach Leistungsdatum* umstellen; die jeweils andere
-Summe steht immer als Hinweis daneben.
-
-Die Zahlen gibt es zusätzlich als **CSV** – zum Weiterreichen an die
-Steuerberatung.
-
-**Das ist keine Steuerberatung.** Die Übersicht fasst zusammen, was in diesem
-Auftragsbuch steht. Ob ein Posten abziehbar ist und in welchem Jahr er zählt,
-entscheidet der Einzelfall.
+Zum Vergleich lässt sich auf *nach Leistungsdatum* umstellen – dann zählt, wann
+gearbeitet wurde.
 
 ---
 
@@ -373,7 +436,7 @@ entscheidet der Einzelfall.
 *Bericht & PDF* (Startseite oder das ▤ in der Bereichsansicht):
 
 1. **Bereich**: Selbstständigkeit, Anstellung, Betriebsausgaben, alle – oder
-   die **Steuerübersicht für ein Jahr** (Abschnitt 6c).
+   **Einnahmen und Ausgaben je Monat (Steuer)** (Abschnitt 6c).
 2. **Umfang**: einzelner Monat, ganzes Jahr oder alles.
 3. **Bericht anzeigen** → Vorschau.
 4. **Drucken / als PDF sichern** → im Druckdialog „Als PDF sichern".
@@ -419,7 +482,7 @@ Was beim Einlesen auffiel, steht in Abschnitt 11.
 | **JSON** (Datei oder Text) | vollständige Sicherung inkl. Papierkorb, Rechnungen und laufender Kosten | **ja** |
 | **CSV** | Weiterrechnen in Excel / Numbers | nein |
 | **CSV Rechnungen** | das Rechnungsbuch als Tabelle | nein |
-| **CSV Steuer** | die Zahlen der Steuerübersicht | nein |
+| **CSV Steuer** | Einnahmen und Ausgaben je Monat, dahinter die Einzelposten | nein |
 
 **Ein PDF ist kein Datenbackup.** Zieh daneben regelmäßig die JSON-Sicherung.
 Liegt die letzte mehr als 30 Tage zurück, erinnert die Startseite daran.
@@ -502,6 +565,15 @@ Gelesen werden `5,49`, `5.49`, `1.234,56` und `1 234,56`; entscheidend ist das
 zuletzt stehende Trennzeichen. Jeder eingegebene Betrag wird auf volle Cent
 gerundet, damit sich keine Reste wie `5,490000000000001` durchs Rechnen ziehen.
 
+**Seitenumbruch der Rechnung.** Browser beherrschen kein CSS Paged Media und
+können deshalb keine Seitenzahl in ein Dokument schreiben. Die App verteilt die
+Rechnung darum selbst auf A4-Seiten: Sie misst die Bausteine auf einem
+unsichtbaren Bogen in Originalgröße, füllt Seite für Seite und bricht die
+Positionstabelle notfalls zeilenweise um, wobei die Kopfzeile der Tabelle
+wiederholt wird. Erst dadurch kann `@page { margin: 0 }` gelten – und genau das
+nimmt dem Browser den Platz für seine eigene Kopf- und Fußzeile mit der
+Web-Adresse.
+
 **Gespeichert wird** (Sicherungsformat `schema: 5`):
 
 ```
@@ -511,6 +583,10 @@ rechnungen   Rechnungen mit Positionen und Kundenanschrift
 abos         laufende Kosten
 settings     Sätze, Firmenangaben, Grenzen nach § 19 UStG
 ```
+
+Ein Eintrag mit `steuer: false` bleibt aus der Steuerübersicht heraus, zählt
+aber überall sonst mit. Fehlt das Feld – etwa in einer älteren Sicherung –,
+gilt es als gesetzt.
 
 Ältere Sicherungen (`schema: 4` und davor) passen unverändert hinein; die neuen
 Listen sind dort schlicht leer. Beim Einspielen werden auch Rechnungen und
