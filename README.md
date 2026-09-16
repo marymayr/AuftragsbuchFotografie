@@ -6,8 +6,11 @@ der Startseite in zwei Gruppen sortiert:
 **Selbstständigkeit**
 - **Einnahmen** – eigene Aufträge mit Kunde, Auftragsart, Ort, Kontakt, Honorar,
   Anzahlung, Rechnungsnummer, Auftragsstatus und der Übermittlung der Fotos.
+- **Rechnungen** – Rechnungen schreiben, selbst nummerieren und als PDF sichern,
+  mit allen Pflichtangaben und dem Hinweis nach § 19 UStG.
 - **Betriebsausgaben** – Anschaffungen und Kosten, von der Gewerbeanmeldung bis
-  zum Objektiv.
+  zum Objektiv, dazu die **laufenden Kosten**, die jeden Monat von selbst
+  gebucht werden.
 
 **Anstellung**
 - **Martin Slováček** – Arbeitszeiten mit Stundensatz, Fahrzeit und Fahrtgeld.
@@ -17,7 +20,12 @@ rechts; auf dem Handy stapeln sich die Gruppen untereinander.
 
 Läuft vollständig im Browser: kein Server, kein Konto, keine Cloud. Alle Daten
 liegen verschlüsselt auf dem Gerät. Monats-, Jahres- und Gesamtberichte lassen
-sich jederzeit als PDF herausziehen.
+sich jederzeit als PDF herausziehen, ebenso die **Steuerübersicht** mit der
+Einnahmen-Überschuss-Rechnung für die Einkommensteuer.
+
+**Beträge werden auf den Cent genau erfasst.** In jedes Geldfeld darfst du
+`5,49` oder `5.49` schreiben, auch `1.234,56` – die App versteht beides und
+rechnet mit vollen Cent.
 
 ---
 
@@ -129,6 +137,12 @@ Fotos noch rausmüssen.
 - Ausgaben werden **nicht** mehr je Auftrag erfasst – dafür gibt es den eigenen
   Bereich *Betriebsausgaben*.
 
+Im geöffneten Auftrag steht **„Rechnung zu diesem Auftrag schreiben"**. Kunde,
+Leistung, Honorar und Anzahlung sind dann schon eingetragen, und die vergebene
+Rechnungsnummer landet anschließend von selbst im Feld *Rechnungsnr.* des
+Auftrags. Speichere Änderungen am Auftrag vorher – der Wechsel zur Rechnung
+übernimmt den gespeicherten Stand.
+
 ---
 
 ## 5. Arbeitszeit für Martin
@@ -188,6 +202,49 @@ Betriebsausgaben werden nicht abgerechnet; statt des Häkchens steht dort ein �
 
 ---
 
+## 5c. Laufende Kosten
+
+Für alles, was jeden Monat von selbst abgeht: Software-Abos, Cloud-Speicher,
+Versicherung. Einmal hinterlegt, bucht die App den Posten in **jedem fälligen
+Monat** selbst in die Betriebsausgaben.
+
+Zu erreichen über *Startseite → Laufende Kosten*, über *Sätze & Einstellungen*
+oder unten in der Ausgabenansicht.
+
+| Feld | Wofür |
+|---|---|
+| Wofür | Pflichtfeld, z. B. „Adobe Lightroom" |
+| Betrag | Pflichtfeld, z. B. `5,49` |
+| Rhythmus | monatlich · vierteljährlich · halbjährlich · jährlich |
+| Erster Monat | ab wann gebucht wird |
+| Letzter Monat | optional, z. B. nach der Kündigung |
+| Am wievielten | 1 bis 28 – diesen Tag gibt es in jedem Monat |
+| Kategorie, Zahlungsart, Anbieter, Beleg, Notiz | wie bei einer einzelnen Ausgabe |
+
+**Beispiel:** Lightroom, 5,49 €, monatlich, ab Januar 2026 → im September 2026
+stehen neun Posten in den Betriebsausgaben, zusammen 49,41 €, und in der
+Übersicht 65,88 € im Jahr.
+
+**So verhält es sich:**
+
+- Gebucht wird nur **bis zum laufenden Monat**. Die Zukunft bleibt offen –
+  es steht nie eine Ausgabe im Buch, die noch gar nicht angefallen ist.
+- Fehlende Monate werden bei jedem Start nachgetragen; die Startseite meldet,
+  wie viele es waren.
+- Jeder erzeugte Posten hat eine **feste Kennung**. Deshalb entsteht nichts
+  doppelt – auch nicht nach dem Einspielen einer Sicherung. In der Liste tragen
+  diese Posten die Marke *„laufende Kosten"*.
+- Ein gebuchter Posten ist ein ganz normaler Eintrag: Du kannst ihn öffnen,
+  den Betrag ändern oder ihn in den Papierkorb legen. Aus dem Papierkorb wird
+  er **nicht** erneut gebucht.
+- Änderst du den Betrag der Kostenstelle, gilt der neue Preis für die **nächsten**
+  Buchungen. Bereits gebuchte Monate bleiben, wie sie waren – sie sind ja
+  tatsächlich so abgegangen.
+- **Pause** hält die Buchungen an, **Ende** entfernt die Kostenstelle. Beides
+  lässt die bereits gebuchten Posten unangetastet.
+
+---
+
 ## 6. Abrechnen
 
 Ein Tipp auf das **Kästchen links** rechnet eine einzelne Zeile ab, **Monat
@@ -198,16 +255,131 @@ im Bericht ausgewiesen.
 
 ---
 
+## 6b. Rechnungen schreiben
+
+Über die Karte **Rechnungen** auf der Startseite oder aus einem Auftrag heraus.
+
+### Einmalig: die eigenen Angaben
+
+Zahnrad in der Rechnungsansicht → **Meine Rechnungsangaben**. Hier stehen Name,
+Anschrift, Steuernummer, Kontakt und Bankverbindung; sie erscheinen auf jeder
+Rechnung. Fehlt etwas davon, warnt die App in der Liste und im Formular –
+ohne diese Angaben ist eine Rechnung nicht vorschriftsmäßig.
+
+Dort stehen auch die Vorgaben für neue Rechnungen: Zahlungsziel, Anrede,
+Einleitung und Schlusssatz. Jede einzelne Rechnung darf davon abweichen.
+
+### Die Rechnungsnummer
+
+Du vergibst sie **selbst**. Das Feld ist beim Anlegen mit einem Vorschlag
+gefüllt – die zuletzt angelegte Nummer um eins weitergezählt, beim ersten Mal
+`2026-001`. Du kannst sie beliebig überschreiben; eine bereits vergebene Nummer
+weist die App ab. Gespeichert wird sie mit der Rechnung, ohne weiteres Zutun.
+
+### Pflichtangaben
+
+Unter dem Formular steht laufend, was zu einer vollständigen Rechnung nach
+§ 14 UStG noch fehlt:
+
+| Pflichtangabe | Woher |
+|---|---|
+| Vollständiger Name und Anschrift des Ausstellers | *Meine Rechnungsangaben* |
+| Name und Anschrift des Empfängers | Abschnitt *Rechnung an* |
+| Steuernummer oder USt-IdNr. | *Meine Rechnungsangaben* |
+| Ausstellungsdatum | Rechnungsdatum |
+| Fortlaufende, einmalige Rechnungsnummer | Rechnungsnummer |
+| Menge und Art der Leistung | Positionen |
+| Zeitpunkt der Leistung | *Leistung erbracht am* (bei einem Zeitraum auch *bis*) |
+| Entgelt | Summe der Positionen |
+| Grund der Steuerbefreiung | Hinweis nach § 19 UStG |
+
+Bei der Kleinunternehmerregelung entfallen Steuersatz und Steuerbetrag. An ihre
+Stelle tritt der Satz, der bei angehaktem Schalter auf jede Rechnung gedruckt
+wird:
+
+> Gemäß § 19 UStG (Kleinunternehmerregelung) wird keine Umsatzsteuer berechnet.
+
+### Positionen
+
+Jede Position hat Beschreibung, Menge, Einheit (Std, Stk, Pauschale …) und
+Einzelpreis. Menge und Preis dürfen Nachkommastellen haben – `6,5 Std × 45,50 €`
+ergibt 295,75 €. Eine bereits gezahlte **Anzahlung** wird unten abgezogen, auf
+der Rechnung steht dann *„Noch zu zahlen"*.
+
+### Status und PDF
+
+**Entwurf · Gestellt · Bezahlt · Storniert.** Das Kästchen links in der Liste
+setzt eine Rechnung auf *Bezahlt* und zurück. Eine gestellte Rechnung, die nicht
+mehr gilt, wird **storniert statt gelöscht** – so bleibt die Nummernfolge
+lückenlos. Ist das Zahlungsziel überschritten, steht *überfällig* an der Zeile.
+
+Das **▤** rechts in der Zeile (oder *Vorschau* im Formular) öffnet den fertigen
+Bogen. Von dort *Drucken / als PDF sichern* – die Rechnung wird **A4 hoch**
+gedruckt, die Berichte weiterhin quer.
+
+---
+
+## 6c. Steuerübersicht für die Einkommensteuer
+
+*Startseite → Steuern & EÜR* oder *Bericht & PDF → Steuerübersicht für ein Jahr*.
+
+Ein Jahresbogen, der zusammenstellt, was für die Steuererklärung gebraucht wird:
+
+- **Einnahmen-Überschuss-Rechnung**: Betriebseinnahmen, Betriebsausgaben, Gewinn.
+- **Wohin die Zahlen gehören**: Anlage EÜR, Anlage S bzw. G, Anlage N. Genannt
+  wird der Abschnitt, nicht die Zeilennummer – die ändert sich jedes Jahr.
+- **Kleinunternehmerregelung**: der vereinnahmte Umsatz des Vorjahres und des
+  laufenden Jahres gegen die Grenzen nach § 19 UStG, mit Urteil im Klartext.
+  Die Grenzen (Stand 2025: 25.000 € / 100.000 €) stehen in *Meine
+  Rechnungsangaben* und lassen sich nachziehen, wenn der Gesetzgeber sie ändert.
+- **Betriebsausgaben nach Kategorie**, als Tabelle mit Anteilen und als Diagramm.
+- **Jeder einzelne Zufluss** und **jede einzelne Ausgabe** des Jahres, zum
+  Abgleich mit dem Kontoauszug. Bei den Ausgaben steht dabei, ob sie einzeln
+  erfasst oder aus den laufenden Kosten gebucht wurden.
+- **Rechnungen des Jahres** mit Status und offenen Beträgen.
+- **Was noch zu tun ist**: fehlende Belege, offene Forderungen, überfällige
+  Rechnungen, fehlende Zahlungsdaten.
+
+### Zufluss oder Leistung
+
+Für die Einnahmen-Überschuss-Rechnung gilt das **Zuflussprinzip**: eine Einnahme
+zählt in dem Jahr, in dem das Geld da war. Genau so rechnet die Übersicht in der
+Voreinstellung.
+
+- Eine **Anzahlung** zählt zum Datum des Auftrags – ein eigenes Datum wird dafür
+  nicht erfasst.
+- Ein **abgerechneter Auftrag** zählt zum Zahlungsdatum aus der Abrechnung.
+  Fehlt es, nimmt die App ersatzweise das Auftragsdatum und **weist die Summe
+  gesondert aus**. Wenn es auf den Monat ankommt, trage das Zahlungsdatum beim
+  Abrechnen nach.
+- **Ausgaben** sind ohnehin mit ihrem Zahlungsdatum erfasst.
+
+Zum Vergleich lässt sich auf *nach Leistungsdatum* umstellen; die jeweils andere
+Summe steht immer als Hinweis daneben.
+
+Die Zahlen gibt es zusätzlich als **CSV** – zum Weiterreichen an die
+Steuerberatung.
+
+**Das ist keine Steuerberatung.** Die Übersicht fasst zusammen, was in diesem
+Auftragsbuch steht. Ob ein Posten abziehbar ist und in welchem Jahr er zählt,
+entscheidet der Einzelfall.
+
+---
+
 ## 7. PDF-Bericht und Sicherung
 
 ### PDF
 
 *Bericht & PDF* (Startseite oder das ▤ in der Bereichsansicht):
 
-1. **Bereich**: Selbstständigkeit, Anstellung, Betriebsausgaben oder alle.
+1. **Bereich**: Selbstständigkeit, Anstellung, Betriebsausgaben, alle – oder
+   die **Steuerübersicht für ein Jahr** (Abschnitt 6c).
 2. **Umfang**: einzelner Monat, ganzes Jahr oder alles.
 3. **Bericht anzeigen** → Vorschau.
 4. **Drucken / als PDF sichern** → im Druckdialog „Als PDF sichern".
+
+Rechnungen laufen über den eigenen Bereich *Rechnungen* (Abschnitt 6b) und
+drucken **hochkant**; alles andere quer.
 
 Der Bericht kommt im Querformat A4 mit Kopfzeile, sechs Kennzahlen je Bereich,
 einem Säulendiagramm (Betrag pro Tag / Monat / Jahr), einem Balkendiagramm der
@@ -244,8 +416,10 @@ Was beim Einlesen auffiel, steht in Abschnitt 11.
 | Format | Zweck | Zurückspielbar |
 |---|---|---|
 | **PDF** | Ansehen, archivieren, ausdrucken | nein |
-| **JSON** (Datei oder Text) | vollständige Sicherung inkl. Papierkorb | **ja** |
+| **JSON** (Datei oder Text) | vollständige Sicherung inkl. Papierkorb, Rechnungen und laufender Kosten | **ja** |
 | **CSV** | Weiterrechnen in Excel / Numbers | nein |
+| **CSV Rechnungen** | das Rechnungsbuch als Tabelle | nein |
+| **CSV Steuer** | die Zahlen der Steuerübersicht | nein |
 
 **Ein PDF ist kein Datenbackup.** Zieh daneben regelmäßig die JSON-Sicherung.
 Liegt die letzte mehr als 30 Tage zurück, erinnert die Startseite daran.
@@ -263,7 +437,15 @@ Es gibt keine automatische Bereinigung und kein Ablaufdatum.
 **Einzelner Eintrag** → öffnen → *Papierkorb*. Er verschwindet aus Listen,
 Summen und Berichten, bleibt aber vollständig erhalten. Unter *Sätze &
 Einstellungen → Papierkorb* lässt er sich **wiederherstellen** oder gezielt
-**endgültig löschen** (mit Rückfrage).
+**endgültig löschen** (mit Rückfrage). Rechnungen liegen im selben Papierkorb
+und lassen sich von dort zurückholen.
+
+Zwei Sonderfälle nennt die App beim Löschen selbst:
+
+- Ein Posten aus den **laufenden Kosten** wird nach dem *endgültigen* Löschen
+  beim nächsten Start erneut gebucht – im Papierkorb bliebe er dagegen draußen.
+- Eine bereits gestellte **Rechnung** gehört storniert, nicht gelöscht; sonst
+  reißt die Nummernfolge.
 
 **Alles löschen** → *Sätze & Einstellungen*, roter Punkt. Dreifach gesichert:
 
@@ -284,6 +466,8 @@ keine externen Schriften oder Bibliotheken und enthält kein Tracking.
 Nicht geschützt ist damit gegen Schadsoftware auf dem Gerät selbst; eine
 Festplattenverschlüsselung ersetzt es nicht. Und: **die JSON-Sicherung ist
 unverschlüsselt** – gut lesbar zum Wiederherstellen, aber sorgsam abzulegen.
+Seit den Rechnungen stehen darin auch **Namen und Anschriften deiner Kunden**.
+Leg die Sicherungen entsprechend ab und schick sie nicht ungeschützt herum.
 
 ---
 
@@ -291,8 +475,8 @@ unverschlüsselt** – gut lesbar zum Wiederherstellen, aber sorgsam abzulegen.
 
 ```
 index.html   Gerüst der Seite
-app.css      Gestaltung inkl. Druck-Layout (A4 quer) für die Berichte
-app.js       Logik, Verschlüsselung, Berechnung, Diagramme, Berichte
+app.css      Gestaltung inkl. Druck-Layout: Berichte A4 quer, Rechnungen A4 hoch
+app.js       Logik, Verschlüsselung, Berechnung, Diagramme, Berichte, Rechnungen
 manifest.json / sw.js / icon-*.png   für Installation und Offline-Betrieb
 ```
 
@@ -310,6 +494,31 @@ Kilometer   bezahlte Zeit = 0                       Betrag = (km − 20) × 0,20
 
 Gerechnet wird immer mit der exakten Zeit, nicht mit der auf zwei Stellen
 gerundeten Anzeige.
+
+**Beträge und Eingabe.** Geldfelder sind Textfelder mit Dezimal-Tastatur, keine
+`<input type="number">`. Ein Zahlenfeld erklärt `5,49` nämlich für ungültig und
+liefert dann einen **leeren** Wert – genau daran scheiterten bisher die Cent.
+Gelesen werden `5,49`, `5.49`, `1.234,56` und `1 234,56`; entscheidend ist das
+zuletzt stehende Trennzeichen. Jeder eingegebene Betrag wird auf volle Cent
+gerundet, damit sich keine Reste wie `5,490000000000001` durchs Rechnen ziehen.
+
+**Gespeichert wird** (Sicherungsformat `schema: 5`):
+
+```
+entries      Einträge aller drei Bereiche
+payments     Abrechnungen
+rechnungen   Rechnungen mit Positionen und Kundenanschrift
+abos         laufende Kosten
+settings     Sätze, Firmenangaben, Grenzen nach § 19 UStG
+```
+
+Ältere Sicherungen (`schema: 4` und davor) passen unverändert hinein; die neuen
+Listen sind dort schlicht leer. Beim Einspielen werden auch Rechnungen und
+laufende Kosten nur **ergänzt**, neuere Fassungen gewinnen.
+
+Ein von den laufenden Kosten gebuchter Posten trägt die Kennung
+`abo-<Kostenstelle>-<Monat>`. Weil sie sich aus Kostenstelle und Monat ergibt,
+kann derselbe Monat nie zweimal entstehen.
 
 Der Bereich „Selbstständigkeit" heißt intern weiterhin `self`, damit ältere
 Sicherungen unverändert passen.

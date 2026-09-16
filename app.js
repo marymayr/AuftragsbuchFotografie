@@ -27,7 +27,8 @@ var DEF_SAETZE=[
   {ab:'2025-10', foto:20.00, ausschank:15.50},
   {ab:'2026-06', foto:23.00, ausschank:15.50}
 ];
-var DEF_SETTINGS={ kmRate:0.20, kmFrei:20, fahrFaktor:0.5, rateSelf:0, saetze:null };
+var DEF_SETTINGS={ kmRate:0.20, kmFrei:20, fahrFaktor:0.5, rateSelf:0, saetze:null,
+                   firma:null, kuVorjahr:KU_VORJAHR, kuLaufend:KU_LAUFEND, steuerBasis:'zufluss' };
 
 var ARTEN=['Hochzeit','Portrait','Familie','Business','Event','Produkt','Immobilien','Tiere','Sonstiges'];
 var STATUS=['Anfrage','Bestätigt','Durchgeführt','Abgeschlossen','Storniert'];
@@ -44,13 +45,38 @@ var KATEGORIEN=['Gewerbe & Behörden','Kamera & Objektive','Blitz & Licht','Spei
                 'Weiterbildung','Werbung & Web','Büro & Porto','Fahrtkosten','Sonstiges'];
 var ZAHLARTEN=['Bankkarte','Bar','Überweisung','PayPal','Rechnung','Sonstiges'];
 
+/* Laufende Kosten – einmal hinterlegt, je Fälligkeitsmonat selbst gebucht. */
+var INTERVALLE=[['monat','monatlich',1],['quartal','vierteljährlich',3],
+                ['halb','halbjährlich',6],['jahr','jährlich',12]];
+
+/* Rechnungen */
+var RG_STATUS=['Entwurf','Gestellt','Bezahlt','Storniert'];
+var RG_DOT={'Entwurf':'dot-muted','Gestellt':'dot-gold','Bezahlt':'dot-good','Storniert':'dot-red'};
+/* Der Hinweis, der bei der Kleinunternehmerregelung auf jede Rechnung gehört. */
+var UST19_HINWEIS='Gemäß § 19 UStG (Kleinunternehmerregelung) wird keine Umsatzsteuer berechnet.';
+/* Absender und Steuerdaten – stehen auf jeder Rechnung. */
+var DEF_FIRMA={
+  name:'', zusatz:'', strasse:'', plz:'', ort:'',
+  telefon:'', email:'', web:'',
+  steuernr:'', ustid:'',
+  kontoinhaber:'', iban:'', bic:'', bank:'',
+  zahlungsziel:14, kleinunternehmer:true,
+  anrede:'Sehr geehrte Damen und Herren,',
+  anschreiben:'vielen Dank für den Auftrag. Für meine Leistung stelle ich Ihnen wie vereinbart in Rechnung:',
+  schluss:'Herzlichen Dank für Ihr Vertrauen.'
+};
+/* Grenzen der Kleinunternehmerregelung nach § 19 UStG (Stand 2025):
+   Vorjahresumsatz höchstens 25.000 €, laufendes Jahr höchstens 100.000 €.
+   Beide Werte lassen sich in den Einstellungen nachziehen. */
+var KU_VORJAHR=25000, KU_LAUFEND=100000;
+
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v11 · 15.08.2026';
+var APP_VERSION='v12 · 16.09.2026';
 /* Kennzeichen des Excel-Stands. Wird nach dem einmaligen Übernehmen in den
    Einstellungen vermerkt, damit es nicht bei jedem Start erneut passiert. */
 var XL_STAND='martin-arbeitszeit-bezahlt-bis-2026-07-25';
 
-var entries=[], payments=[], settings={}, cryptoKey=null, meta=null;
+var entries=[], payments=[], rechnungen=[], abos=[], settings={}, cryptoKey=null, meta=null;
 
 var ui={
   view:'home', area:'martin', month:null, jahr:'', modus:'monat',
@@ -58,7 +84,9 @@ var ui={
   sucheAn:false, suche:'', fArt:'', fStatus:'',
   fArea:'martin', fArt2:'fotografisch', fModus:'regulaer', fTime:'range', fBilling:'fix',
   errs:{}, draft:{}, saveErr:false, legacyOffen:false, xlNeu:0, xlAkt:0,
-  repBereich:'martin', repUmfang:'monat', repJahr:'', repMonat:'', repOffen:false
+  repBereich:'martin', repUmfang:'monat', repJahr:'', repMonat:'', repOffen:false,
+  rgId:null, rgSuche:'', rgJahr:'', aboId:null, stJahr:'', stBasis:'zufluss',
+  rgWarn:'', aboNeu:0
 };
 
 /* ============ kleinkram ============ */
@@ -75,14 +103,63 @@ function mMini(k){var a=k.split('-').map(Number);return new Date(a[0],a[1]-1,1).
 function dShort(iso){if(!iso)return'';var a=iso.split('-').map(Number);return p2(a[2])+'.'+p2(a[1])+'.'+String(a[0]).slice(2);}
 function dLang(iso){if(!iso)return'–';var a=iso.split('-').map(Number);return p2(a[2])+'.'+p2(a[1])+'.'+a[0];}
 function eur(n){return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR'}).format(n||0);}
-function eur0(n){return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n||0);}
+/* Kompakte Darstellung für Kacheln und Summenzeilen: volle Euro, solange
+   dabei nichts verloren geht. Krumme Beträge behalten ihre Cent – sonst
+   stünde bei 5,49 € nur „5 €“. */
+function eur0(n){
+  n=Number(n)||0;
+  if(Math.abs(n-Math.round(n))>=0.005) return eur(n);
+  return new Intl.NumberFormat('de-DE',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n);
+}
 function dec2(n){return new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0);}
 function hm(d){var neg=d<0;d=Math.abs(d||0);var h=Math.floor(d+1e-9),m=Math.round((d-h)*60);if(m===60){m=0;h++;}return (neg?'-':'')+h+':'+p2(m);}
 function add(a){return a.reduce(function(s,n){return s+(Number(n)||0);},0);}
 function esc(s){return (s==null?'':String(s)).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 function v(id){var e=document.getElementById(id);return e?e.value:'';}
-function num(x){var n=Number(String(x).replace(',','.'));return isNaN(n)?0:n;}
+/* Zahlen so lesen, wie sie auf einer deutschen Tastatur entstehen:
+   „5,49“, „5.49“, „1.234,56“ und „1 234,56“ meinen alle dasselbe. */
+function num(x){
+  var s=String(x==null?'':x).replace(/[\s\u00A0\u202F€]/g,'');
+  if(!s) return 0;
+  var k=s.lastIndexOf(','), p=s.lastIndexOf('.');
+  if(k>=0&&p>=0){
+    /* Das zuletzt stehende Zeichen trennt die Nachkommastellen ab. */
+    s = k>p ? s.slice(0,k).replace(/\./g,'')+'.'+s.slice(k+1)
+            : s.slice(0,p).replace(/,/g,'')+'.'+s.slice(p+1);
+  }else if(k>=0){
+    s = s.slice(0,k).replace(/,/g,'')+'.'+s.slice(k+1);
+  }else if(p>=0 && s.indexOf('.')!==p){
+    /* Mehrere Punkte können nur Tausendertrenner sein. */
+    s = s.replace(/\./g,'');
+  }
+  var n=Number(s);
+  return isNaN(n)?0:n;
+}
+/* Geldbeträge auf volle Cent runden – sonst schleppt das Rechnen
+   Reste wie 5,490000000000001 mit. */
+function cent(n){ return Math.round((Number(n)||0)*100)/100; }
+/* Ein Betrag, wie er ins Eingabefeld gehört. Was gerade getippt wird, ist
+   eine Zeichenkette und bleibt unangetastet; gespeicherte Zahlen erscheinen
+   mit zwei Nachkommastellen. */
+function geldWert(x){
+  if(x===''||x==null) return '';
+  if(typeof x==='string') return x;
+  return isNaN(Number(x))?'':dec2(Number(x));
+}
+/* Geldfelder sind Textfelder, keine Zahlenfelder: <input type="number">
+   erklärt „5,49“ für ungültig und liefert dann einen leeren Wert – genau
+   deshalb ließen sich bisher nur volle Euro erfassen. */
+function geldFeld(id,val,extra){
+  return '<input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" id="'+id+'"'
+    +' value="'+esc(geldWert(val))+'" placeholder="0,00"'+(extra||'')+'>';
+}
+/* Für Mengen, Kilometer und Stundensätze – gleiche Tastatur, gleiche Regeln. */
+function zahlFeld(id,val,extra,ph){
+  return '<input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" id="'+id+'"'
+    +' value="'+esc(typeof val==='string'?val:(val===''||val==null?'':String(val).replace('.',',')))+'"'
+    +' placeholder="'+esc(ph||'0')+'"'+(extra||'')+'>';
+}
 function nowISO(){return new Date().toISOString();}
 function tageSeit(iso){return Math.round((Date.now()-Date.parse(iso))/86400000);}
 function stamp(){var d=new Date();return dLang(today())+' um '+p2(d.getHours())+':'+p2(d.getMinutes())+' Uhr';}
@@ -123,7 +200,8 @@ function decryptFrom(raw,key){
     .then(function(pl){return JSON.parse(TD.decode(pl));});
 }
 function persist(){
-  return encryptTo({entries:entries,payments:payments,settings:settings,geaendert:nowISO()},cryptoKey)
+  return encryptTo({entries:entries,payments:payments,rechnungen:rechnungen,abos:abos,
+                    settings:settings,geaendert:nowISO()},cryptoKey)
     .then(function(s){ localStorage.setItem(K_VAULT,s); ui.saveErr=false; });
 }
 function save(){ return persist().catch(function(){ ui.saveErr=true; render(); }); }
@@ -154,10 +232,13 @@ function normEntry(o){
   }else if(e.area==='ausgaben'){
     e.bez=o.bez||o.was||'';
     e.kat=KATEGORIEN.indexOf(o.kat)>=0?o.kat:'Sonstiges';
-    e.betrag=Number(o.betrag)||0;
+    e.betrag=cent(Number(o.betrag)||0);
     e.haendler=o.haendler||'';
     e.zahlart=ZAHLARTEN.indexOf(o.zahlart)>=0?o.zahlart:'Bankkarte';
     e.beleg=!!o.beleg;
+    /* Von einer laufenden Kostenstelle erzeugt – daran erkennt die App,
+       welche Posten sie selbst gebucht hat. */
+    if(o.aboId) e.aboId=o.aboId;
     e.timeMode='duration'; e.durH=0; e.durM=0; e.paid=false; e.payment=null;
   }else{
     e.client=o.client||'';
@@ -165,14 +246,72 @@ function normEntry(o){
     e.status=STATUS.indexOf(o.status)>=0?o.status:(o.paid?'Abgeschlossen':'Bestätigt');
     e.ort=o.ort||''; e.telefon=o.telefon||''; e.email=o.email||'';
     e.billing=o.billing==='hourly'?'hourly':'fix';
-    e.amount=Number(o.amount)||0; e.rate=Number(o.rate)||0;
-    e.anzahlung=Number(o.anzahlung)||0; e.ausgaben=Number(o.ausgaben)||0;
+    e.amount=cent(Number(o.amount)||0); e.rate=cent(Number(o.rate)||0);
+    e.anzahlung=cent(Number(o.anzahlung)||0); e.ausgaben=cent(Number(o.ausgaben)||0);
     e.rechnung=o.rechnung||'';
     e.uebergabe=UEBERGABE.indexOf(o.uebergabe)>=0?o.uebergabe:UEBERGABE[0];
     if(o.fotos) e.fotos=Number(o.fotos)||0;
   }
   return e;
 }
+/* ---- laufende Kosten ---- */
+function normAbo(o){
+  o=o||{};
+  var keys=INTERVALLE.map(function(x){return x[0];});
+  return {
+    id:o.id||uid(),
+    bez:o.bez||'',
+    kat:KATEGORIEN.indexOf(o.kat)>=0?o.kat:'Software & Abos',
+    betrag:cent(Number(o.betrag)||0),
+    haendler:o.haendler||'',
+    zahlart:ZAHLARTEN.indexOf(o.zahlart)>=0?o.zahlart:'Bankkarte',
+    beleg:o.beleg!==false,
+    notiz:o.notiz||'',
+    intervall:keys.indexOf(o.intervall)>=0?o.intervall:'monat',
+    /* Nur 1 bis 28 – so gibt es den Tag in jedem Monat wirklich. */
+    tag:Math.min(28,Math.max(1,Number(o.tag)||1)),
+    ab:o.ab||curMk(),
+    bis:o.bis||'',
+    aktiv:o.aktiv!==false,
+    erstellt:o.erstellt||nowISO(),
+    bearbeitet:o.bearbeitet||o.erstellt||nowISO(),
+    geloescht:!!o.geloescht
+  };
+}
+
+/* ---- Rechnungen ---- */
+function normPosten(p){
+  p=p||{};
+  return {text:p.text||'', menge:Number(p.menge)||0,
+          einheit:p.einheit||'', einzel:cent(Number(p.einzel)||0)};
+}
+function normRechnung(o){
+  o=o||{};
+  var r={
+    id:o.id||uid(),
+    nr:String(o.nr||'').trim(),
+    datum:o.datum||today(),
+    leistungVon:o.leistungVon||'', leistungBis:o.leistungBis||'',
+    status:RG_STATUS.indexOf(o.status)>=0?o.status:'Entwurf',
+    kunde:Object.assign({name:'',zusatz:'',strasse:'',plz:'',ort:'',email:''},o.kunde||{}),
+    posten:(Array.isArray(o.posten)?o.posten:[]).map(normPosten),
+    anzahlung:cent(Number(o.anzahlung)||0),
+    zahlungsziel:Math.max(0,Number(o.zahlungsziel)||0),
+    bezahltAm:o.bezahltAm||'',
+    anrede:o.anrede==null?'Sehr geehrte Damen und Herren,':String(o.anrede),
+    anschreiben:o.anschreiben==null?'':String(o.anschreiben),
+    schluss:o.schluss==null?'':String(o.schluss),
+    kleinunternehmer:o.kleinunternehmer!==false,
+    auftragId:o.auftragId||'',
+    notiz:o.notiz||'',
+    erstellt:o.erstellt||nowISO(),
+    bearbeitet:o.bearbeitet||o.erstellt||nowISO(),
+    geloescht:!!o.geloescht
+  };
+  if(!r.posten.length) r.posten=[normPosten({})];
+  return r;
+}
+
 function normSettings(s){
   var out=Object.assign({},DEF_SETTINGS,s||{});
   var sz=(out.saetze&&out.saetze.length)?out.saetze:null;
@@ -186,14 +325,21 @@ function normSettings(s){
       }
     }
   }
-  out.saetze=sz.map(function(x){return {ab:x.ab||curMk(),foto:Number(x.foto)||0,ausschank:Number(x.ausschank)||0};})
+  out.saetze=sz.map(function(x){return {ab:x.ab||curMk(),foto:cent(Number(x.foto)||0),ausschank:cent(Number(x.ausschank)||0)};})
     .sort(function(a,b){return a.ab.localeCompare(b.ab);});
+  out.firma=Object.assign({},DEF_FIRMA,out.firma||{});
+  out.firma.zahlungsziel=Math.max(0,Number(out.firma.zahlungsziel)||0);
+  out.kuVorjahr=Number(out.kuVorjahr)||KU_VORJAHR;
+  out.kuLaufend=Number(out.kuLaufend)||KU_LAUFEND;
+  out.steuerBasis=out.steuerBasis==='leistung'?'leistung':'zufluss';
   delete out.rateFoto; delete out.rateAusschank;
   return out;
 }
 function adopt(d){
   entries=(d&&Array.isArray(d.entries)?d.entries:[]).map(normEntry);
   payments=(d&&Array.isArray(d.payments)?d.payments:[]);
+  rechnungen=(d&&Array.isArray(d.rechnungen)?d.rechnungen:[]).map(normRechnung);
+  abos=(d&&Array.isArray(d.abos)?d.abos:[]).map(normAbo);
   settings=normSettings(d&&d.settings);
 }
 
@@ -279,6 +425,145 @@ function summe(l){
   };
 }
 
+/* ============ laufende kosten ============ */
+
+function mPlus(m,n){
+  var a=m.split('-').map(Number), d=new Date(a[0],a[1]-1+n,1);
+  return d.getFullYear()+'-'+p2(d.getMonth()+1);
+}
+function tageImMonat(m){
+  var a=m.split('-').map(Number);
+  return new Date(a[0],a[1],0).getDate();
+}
+function intervallSchritt(k){
+  for(var i=0;i<INTERVALLE.length;i++) if(INTERVALLE[i][0]===k) return INTERVALLE[i][2];
+  return 1;
+}
+function intervallName(k){
+  for(var i=0;i<INTERVALLE.length;i++) if(INTERVALLE[i][0]===k) return INTERVALLE[i][1];
+  return 'monatlich';
+}
+function lebendeAbos(){ return abos.filter(function(a){return !a.geloescht;}); }
+/** Was diese Kostenstelle im Jahr kostet – für die Übersicht. */
+function aboJahr(a){ return cent(a.betrag*(12/intervallSchritt(a.intervall))); }
+
+/* Alle Monate, für die diese Kostenstelle schon gebucht gehört. Die Zukunft
+   bleibt außen vor: gebucht wird erst, was auch fällig war. */
+function aboMonate(a){
+  var out=[], m=a.ab, ende=curMk(), schritt=intervallSchritt(a.intervall), schutz=0;
+  if(a.bis && a.bis<ende) ende=a.bis;
+  while(m<=ende && schutz++<1200){ out.push(m); m=mPlus(m,schritt); }
+  return out;
+}
+function aboEintragId(a,m){ return 'abo-'+a.id+'-'+m; }
+
+/* Fehlende Buchungen nachtragen. Die Kennung eines erzeugten Postens steht
+   fest – deshalb entsteht nichts doppelt, auch nicht nach einer Sicherung.
+   Ein Posten, den du löschst, liegt im Papierkorb und wird nicht neu gebucht. */
+function aboLauf(){
+  var vorh={}; entries.forEach(function(e){ vorh[e.id]=1; });
+  var neu=0;
+  lebendeAbos().filter(function(a){return a.aktiv;}).forEach(function(a){
+    if(!a.bez||!a.betrag) return;
+    aboMonate(a).forEach(function(m){
+      var id=aboEintragId(a,m);
+      if(vorh[id]) return;
+      entries.push(normEntry({
+        id:id, area:'ausgaben', aboId:a.id,
+        date:m+'-'+p2(Math.min(a.tag,tageImMonat(m))),
+        bez:a.bez, kat:a.kat, betrag:a.betrag, haendler:a.haendler,
+        zahlart:a.zahlart, beleg:a.beleg, notiz:a.notiz
+      }));
+      vorh[id]=1; neu++;
+    });
+  });
+  return neu;
+}
+
+/* ============ rechnungen ============ */
+
+function rgAlive(){ return rechnungen.filter(function(r){return !r.geloescht;}); }
+function rgFuerAuftrag(id){ return rgAlive().filter(function(r){return r.auftragId===id;})[0]||null; }
+function rgPapier(){ return rechnungen.filter(function(r){return r.geloescht;}); }
+function postenSumme(p){ return cent((Number(p.menge)||0)*(Number(p.einzel)||0)); }
+function rgSumme(r){ return cent(add(r.posten.map(postenSumme))); }
+function rgOffen(r){
+  if(r.status==='Storniert'||r.status==='Bezahlt') return 0;
+  return cent(Math.max(0,rgSumme(r)-(Number(r.anzahlung)||0)));
+}
+function rgZaehlt(r){ return r.status!=='Storniert'; }
+/** Zahlungsziel als Datum – steht so auf der Rechnung. */
+function rgFaellig(r){
+  if(!r.datum) return '';
+  var a=r.datum.split('-').map(Number);
+  var d=new Date(a[0],a[1]-1,a[2]+(Number(r.zahlungsziel)||0));
+  return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+}
+function rgUeberfaellig(r){
+  return r.status==='Gestellt' && rgFaellig(r) && rgFaellig(r)<today();
+}
+function rgJahre(){
+  var s={}; rgAlive().forEach(function(r){ s[r.datum.slice(0,4)]=1; });
+  s[curY()]=1;
+  return Object.keys(s).sort().reverse();
+}
+/* Vorschlag für die nächste Nummer: die zuletzt angelegte Rechnung um eins
+   weiterzählen. Vergeben wird sie trotzdem von Hand – der Vorschlag steht
+   nur schon im Feld. */
+function naechsteNr(){
+  var l=rgAlive().filter(function(r){return r.nr;})
+    .sort(function(a,b){return String(a.erstellt).localeCompare(String(b.erstellt));});
+  var letzte=l.length?l[l.length-1].nr:'';
+  if(!letzte) return curY()+'-001';
+  var m=String(letzte).match(/^([\s\S]*?)(\d+)(\D*)$/);
+  if(!m) return letzte+'-2';
+  var z=String(Number(m[2])+1);
+  while(z.length<m[2].length) z='0'+z;
+  return m[1]+z+m[3];
+}
+function nrVergeben(nr,ausser){
+  nr=String(nr||'').trim().toLowerCase();
+  return rgAlive().some(function(r){
+    return r.id!==ausser && String(r.nr).trim().toLowerCase()===nr;
+  });
+}
+/* Pflichtangaben einer Rechnung nach § 14 UStG. Bei der Kleinunternehmer-
+   regelung entfallen Steuersatz und Steuerbetrag, der Hinweis nach § 19
+   UStG tritt an ihre Stelle. */
+function firmaLuecken(){
+  var f=settings.firma||{}, fehlt=[];
+  if(!f.name) fehlt.push('dein Name');
+  if(!f.strasse) fehlt.push('deine Straße');
+  if(!f.plz||!f.ort) fehlt.push('deine PLZ und Ort');
+  if(!f.steuernr&&!f.ustid) fehlt.push('deine Steuernummer');
+  return fehlt;
+}
+function rgLuecken(r){
+  var fehlt=firmaLuecken();
+  if(!r.nr) fehlt.push('die Rechnungsnummer');
+  if(!r.datum) fehlt.push('das Rechnungsdatum');
+  if(!r.kunde.name) fehlt.push('der Name des Kunden');
+  if(!r.kunde.strasse||!r.kunde.plz||!r.kunde.ort) fehlt.push('die Anschrift des Kunden');
+  if(!r.leistungVon) fehlt.push('der Leistungszeitpunkt');
+  if(!r.posten.some(function(p){return p.text&&postenSumme(p);})) fehlt.push('mindestens eine Position mit Betrag');
+  return fehlt;
+}
+function rgLeistungText(r){
+  if(!r.leistungVon) return '—';
+  if(r.leistungBis&&r.leistungBis!==r.leistungVon) return dLang(r.leistungVon)+' – '+dLang(r.leistungBis);
+  return dLang(r.leistungVon);
+}
+function rgSum(list){
+  var rel=list.filter(rgZaehlt);
+  return {
+    n:list.length, nRel:rel.length,
+    brutto:cent(add(rel.map(rgSumme))),
+    offen:cent(add(rel.map(rgOffen))),
+    bezahlt:cent(add(rel.filter(function(r){return r.status==='Bezahlt';}).map(rgSumme))),
+    ueberfaellig:cent(add(rel.filter(rgUeberfaellig).map(rgOffen)))
+  };
+}
+
 /* ============ selektoren ============ */
 
 function alive(){return entries.filter(function(e){return !e.geloescht;});}
@@ -333,6 +618,102 @@ function treffer(a){
     }
     return true;
   })).reverse();
+}
+
+/* ============ steuern ============
+   Die Einnahmen-Überschuss-Rechnung folgt dem Zuflussprinzip: Einnahmen
+   zählen in dem Jahr, in dem das Geld da war, Ausgaben in dem Jahr, in dem
+   sie bezahlt wurden. Wo kein Zahlungsdatum hinterlegt ist, nimmt die App
+   ersatzweise das Datum des Eintrags und weist die Summe gesondert aus –
+   damit klar bleibt, was belegt ist und was geschätzt.
+   ================================================================== */
+
+function einnahmePosten(e){
+  var out=[], ges=amountOf(e);
+  if(!zaehlt(e)||ges<=0) return out;
+  var anz=anzOf(e);
+  if(anz>0) out.push({datum:e.date,betrag:anz,art:'Anzahlung',genau:false});
+  if(e.paid){
+    var rest=cent(ges-anz);
+    if(rest>0) out.push({datum:(e.payment&&e.payment.date)||e.date,betrag:rest,art:'Zahlung',
+                         genau:!!(e.payment&&e.payment.date)});
+  }
+  return out;
+}
+/** Was in einem Jahr tatsächlich eingegangen ist. */
+function zuflussJahr(area,y){
+  var summe=0, ungenau=0;
+  areaEntries(area).forEach(function(e){
+    einnahmePosten(e).forEach(function(z){
+      if(z.datum.slice(0,4)!==y) return;
+      summe+=z.betrag;
+      if(!z.genau) ungenau+=z.betrag;
+    });
+  });
+  return {summe:cent(summe), ungenau:cent(ungenau)};
+}
+/** Was in einem Jahr geleistet wurde – unabhängig davon, wann gezahlt wurde. */
+function leistungJahr(area,y){
+  return cent(add(yearEntries(area,y).filter(zaehlt).map(amountOf)));
+}
+function steuerJahr(y,basis){
+  basis = basis==='leistung' ? 'leistung' : 'zufluss';
+  var zu=zuflussJahr('self',y);
+  var einnahmen = basis==='leistung' ? leistungJahr('self',y) : zu.summe;
+
+  /* Ausgaben sind mit ihrem Zahlungsdatum erfasst – beide Betrachtungen
+     führen hier zum selben Ergebnis. */
+  var ausgListe=yearEntries('ausgaben',y);
+  var ausgaben=cent(add(ausgListe.map(amountOf)));
+  var nachKat=KATEGORIEN.map(function(k){
+    var g=ausgListe.filter(function(e){return e.kat===k;});
+    return {kat:k, n:g.length, betrag:cent(add(g.map(amountOf)))};
+  }).filter(function(x){return x.n;});
+  var ohneBeleg=cent(add(ausgListe.filter(function(e){return !e.beleg;}).map(amountOf)));
+
+  var lohnZu=zuflussJahr('martin',y);
+  var lohn = basis==='leistung' ? leistungJahr('martin',y) : lohnZu.summe;
+
+  /* Für § 19 UStG zählt der vereinnahmte Gesamtumsatz – unabhängig davon,
+     welche Betrachtung oben gewählt ist. */
+  var umsatz=zuflussJahr('self',y).summe;
+  var umsatzVor=zuflussJahr('self',String(Number(y)-1)).summe;
+
+  var offen=cent(add(areaEntries('self').filter(function(e){
+    return e.date.slice(0,4)===y;
+  }).map(offenOf)));
+
+  var rg=rgAlive().filter(function(r){return r.datum.slice(0,4)===y;});
+
+  return {
+    jahr:y, basis:basis,
+    einnahmen:einnahmen, einnahmenUngenau:basis==='zufluss'?zu.ungenau:0,
+    einnahmenAndere: basis==='leistung' ? zu.summe : leistungJahr('self',y),
+    ausgaben:ausgaben, nachKat:nachKat, ohneBeleg:ohneBeleg,
+    gewinn:cent(einnahmen-ausgaben),
+    lohn:lohn, lohnUngenau:basis==='zufluss'?lohnZu.ungenau:0,
+    umsatz:umsatz, umsatzVor:umsatzVor,
+    grenzeVor:Number(settings.kuVorjahr)||KU_VORJAHR,
+    grenzeLauf:Number(settings.kuLaufend)||KU_LAUFEND,
+    offen:offen,
+    ausgListe:ausgListe,
+    rg:rg, rgSum:rgSum(rg),
+    nEinn:yearEntries('self',y).filter(zaehlt).length
+  };
+}
+/** Kurzurteil zur Kleinunternehmerregelung. */
+function kuLage(st){
+  if(st.umsatzVor>st.grenzeVor)
+    return {ok:false, text:'Der Umsatz des Vorjahres lag über '+eur0(st.grenzeVor)
+      +'. Für '+st.jahr+' gilt die Kleinunternehmerregelung dann nicht mehr – bitte steuerlich beraten lassen.'};
+  if(st.umsatz>st.grenzeLauf)
+    return {ok:false, text:'Der Umsatz überschreitet im laufenden Jahr '+eur0(st.grenzeLauf)
+      +'. Ab diesem Zeitpunkt entfällt die Regelung – bitte steuerlich beraten lassen.'};
+  if(st.umsatz>st.grenzeVor*0.8)
+    return {ok:true, warn:true, text:'Der Umsatz nähert sich der Grenze von '+eur0(st.grenzeVor)
+      +' für das Folgejahr. Bleibt er darüber, entfällt die Regelung im nächsten Jahr.'};
+  return {ok:true, text:'Vorjahr '+eur(st.umsatzVor)+' (Grenze '+eur0(st.grenzeVor)+') und laufendes Jahr '
+    +eur(st.umsatz)+' (Grenze '+eur0(st.grenzeLauf)+') liegen darunter. Die Kleinunternehmerregelung greift.'};
 }
 
 /* ============ diagramme ============ */
@@ -413,6 +794,7 @@ function rowChart(items,o){
 /* ============ navigation ============ */
 
 function go(view,a){
+  if(view==='rechnungen') return openRechnungen();
   ui.view=view;
   if(a){ ui.area=a; ui.month=curMk(); ui.jahr=curY(); ui.modus='monat'; ui.suche=''; ui.fArt=''; ui.fStatus=''; ui.sucheAn=false; }
   render();
@@ -438,7 +820,7 @@ function onFilter(){
   var box=document.getElementById('ledgerbox');
   if(box) box.innerHTML=ledgerHTML();
 }
-function closeSheet(){ui.sheet=null;ui.editId=null;ui.errs={};render();}
+function closeSheet(){ui.sheet=null;ui.editId=null;ui.rgId=null;ui.rgDraft=null;ui.aboId=null;ui.errs={};render();}
 
 /* ============ eintrag anlegen / bearbeiten ============ */
 
@@ -511,6 +893,9 @@ function saveForm(){
     e.haendler=v('f-haendler').trim();
     e.zahlart=v('f-zahlart')||'Bankkarte';
     e.beleg=!!(document.getElementById('f-beleg')&&document.getElementById('f-beleg').checked);
+    /* Ein von den laufenden Kosten gebuchter Posten bleibt auch nach dem
+       Bearbeiten als solcher erkennbar. */
+    if(old&&old.aboId) e.aboId=old.aboId;
     e.timeMode='duration'; e.durH=0; e.durM=0;
     if(!e.bez) errs.bez='Bezeichnung fehlt';
     if(!e.betrag) errs.betrag='Betrag fehlt';
@@ -560,7 +945,9 @@ function purgeEntry(id){
   var e=entries.find(function(x){return x.id===id;});
   if(!e)return;
   if(!confirm('Diesen einen Eintrag vom '+dLang(e.date)+' endgültig löschen?\n\n'
-    +'Er lässt sich danach nicht mehr wiederherstellen.')) return;
+    +'Er lässt sich danach nicht mehr wiederherstellen.'
+    +(e.aboId?'\n\nAchtung: Der Posten stammt aus den laufenden Kosten. Beim nächsten Start '
+      +'wird er erneut gebucht. Im Papierkorb bliebe er dagegen draußen.':''))) return;
   entries=entries.filter(function(x){return x.id!==id;});
   render(); save();
 }
@@ -578,7 +965,7 @@ function settleTargets(){
 function doSettle(){
   var t=settleTargets(); if(!t.length){closeSheet();return;}
   var soll=add(t.map(offenOf));
-  var got=v('s-amount')===''?soll:num(v('s-amount'));
+  var got=v('s-amount')===''?soll:cent(num(v('s-amount')));
   var rec={id:uid(),area:ui.area,month:ui.month,date:v('s-date')||today(),
            soll:soll,got:got,method:v('s-method'),note:v('s-note').trim(),
            count:t.length,single:!!ui.settleScope};
@@ -606,7 +993,7 @@ function readSaetze(){
   for(var i=0;i<list.length;i++){
     var ab=v('sz-ab-'+i);
     if(!ab) continue;
-    out.push({ab:ab,foto:num(v('sz-foto-'+i)),ausschank:num(v('sz-aus-'+i))});
+    out.push({ab:ab,foto:cent(num(v('sz-foto-'+i))),ausschank:cent(num(v('sz-aus-'+i)))});
   }
   return out.sort(function(a,b){return a.ab.localeCompare(b.ab);});
 }
@@ -624,10 +1011,10 @@ function delSatz(i){
 }
 function saveSettingsForm(){
   settings.saetze=readSaetze();
-  settings.kmRate=num(v('st-kmrate'));
+  settings.kmRate=cent(num(v('st-kmrate')));
   settings.kmFrei=num(v('st-kmfrei'));
   settings.fahrFaktor=num(v('st-faktor'))/100;
-  settings.rateSelf=num(v('st-self'));
+  settings.rateSelf=cent(num(v('st-self')));
   ui.sheet=null;render();save();
 }
 
@@ -659,8 +1046,8 @@ function aktualisieren(){
 function pickFile(){var i=document.getElementById('fileimp');if(i)i.click();}
 
 function backupObjekt(){
-  return {format:'auftragsbuch',schema:4,exportiert:nowISO(),
-          entries:entries,payments:payments,settings:settings};
+  return {format:'auftragsbuch',schema:5,exportiert:nowISO(),
+          entries:entries,payments:payments,rechnungen:rechnungen,abos:abos,settings:settings};
 }
 function exportJSON(){
   download('Auftragsbuch-Sicherung-'+today()+'.json',JSON.stringify(backupObjekt(),null,1),'application/json');
@@ -700,6 +1087,26 @@ function exportCSV(){
   download('Auftragsbuch-'+today()+'.csv','﻿'+[head.join(';')].concat(rows).join('\r\n'),'text/csv;charset=utf-8');
 }
 
+/* Das Rechnungsbuch als Tabelle – Nummer für Nummer. */
+function exportRgCSV(){
+  var q=function(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';};
+  var head=['Rechnungsnummer','Rechnungsdatum','Leistungszeitpunkt','Kunde','Zusatz','Straße','PLZ','Ort',
+            'E-Mail','Status','Fällig am','Bezahlt am','Positionen','Betrag','Anzahlung','Offen',
+            'Kleinunternehmer § 19','Notiz'];
+  var rows=rgAlive().slice().sort(function(a,b){return a.datum.localeCompare(b.datum);}).map(function(r){
+    return [r.nr, dLang(r.datum), rgLeistungText(r), r.kunde.name, r.kunde.zusatz, r.kunde.strasse,
+      r.kunde.plz, r.kunde.ort, r.kunde.email, r.status, dLang(rgFaellig(r)),
+      r.bezahltAm?dLang(r.bezahltAm):'',
+      r.posten.filter(function(p){return p.text;}).map(function(p){
+        return p.text+' ('+dec2(p.menge)+(p.einheit?' '+p.einheit:'')+' × '+dec2(p.einzel)+')';
+      }).join(' | '),
+      dec2(rgSumme(r)), dec2(r.anzahlung), dec2(rgOffen(r)),
+      r.kleinunternehmer?'ja':'nein', (r.notiz||'').replace(/\s*\n\s*/g,' ')].map(q).join(';');
+  });
+  download('Auftragsbuch-Rechnungen-'+today()+'.csv','\ufeff'+[head.map(q).join(';')].concat(rows).join('\r\n'),
+           'text/csv;charset=utf-8');
+}
+
 function mergeDaten(d,quelle){
   var ein=(Array.isArray(d)?d:(d.entries||[])).map(normEntry);
   var vorh={}; entries.forEach(function(e){vorh[e.id]=e;});
@@ -718,6 +1125,17 @@ function mergeDaten(d,quelle){
   if(!Array.isArray(d)){
     var pv={}; payments.forEach(function(p){pv[p.id]=1;});
     (d.payments||[]).forEach(function(p){if(p&&p.id&&!pv[p.id]) payments.push(p);});
+    /* Rechnungen und laufende Kosten wie Einträge: neu dazu, neuere gewinnen. */
+    var rv={}; rechnungen.forEach(function(r){rv[r.id]=r;});
+    (d.rechnungen||[]).map(normRechnung).forEach(function(r){
+      var a=rv[r.id];
+      if(!a) rechnungen.push(r); else if(r.bearbeitet>a.bearbeitet) Object.assign(a,r);
+    });
+    var av={}; abos.forEach(function(x){av[x.id]=x;});
+    (d.abos||[]).map(normAbo).forEach(function(x){
+      var a=av[x.id];
+      if(!a) abos.push(x); else if(x.bearbeitet>a.bearbeitet) Object.assign(a,x);
+    });
     if(d.settings&&(d.settings.saetze||d.settings.rateFoto!=null)&&!(settings.saetze||[]).length){
       settings=normSettings(d.settings);
     }
@@ -809,7 +1227,7 @@ function doWipe(){
   if(!confirm('Letzte Sicherheitsfrage:\n\nAlle Einträge, Abrechnungen, der Papierkorb und das '
     +'Passwort werden jetzt endgültig von diesem Gerät entfernt. Fortfahren?')) return;
   [K_VAULT,K_META,L_ENTRIES,L_PAY,L_SET,L_LOCK,'ab_migrated'].forEach(function(k){localStorage.removeItem(k);});
-  cryptoKey=null; entries=[]; payments=[];
+  cryptoKey=null; entries=[]; payments=[]; rechnungen=[]; abos=[];
   location.reload();
 }
 
@@ -865,6 +1283,11 @@ function cameraSVG(){
 
 function banners(){
   var h='';
+  if(ui.aboNeu&&ui.sheet!=='abos') h+='<div class="banner banner-ok"><b>'+ui.aboNeu+' '
+    +(ui.aboNeu===1?'laufender Posten':'laufende Posten')+' nachgebucht.</b> '
+    +'Die fälligen Monate stehen jetzt in den Betriebsausgaben. '
+    +'<button class="linkbtn" style="color:inherit" onclick="A.openAbos()">Ansehen</button> '
+    +'<button class="linkbtn" style="color:inherit" onclick="A.aboWeg()">Verstanden</button></div>';
   if(ui.xlNeu||ui.xlAkt) h+='<div class="banner banner-ok"><b>'
     +(ui.xlNeu?ui.xlNeu+' Arbeitszeiten übernommen.':'Zahlungsstand aktualisiert.')+'</b> '
     +(ui.xlNeu?'Alle Zeilen für Martin aus der Excel-Liste, Juni 2025 bis August 2026. ':'')
@@ -890,13 +1313,15 @@ function viewHome(){
   h+=banners();
   h+='<div class="gruppen">'
     +'<div class="gruppe"><div class="gruppe-t">Selbstständigkeit</div>'
-    + homeCard('self') + homeCard('ausgaben') + '</div>'
+    + homeCard('self') + rechnungCard() + homeCard('ausgaben') + '</div>'
     +'<div class="gruppe"><div class="gruppe-t">Anstellung</div>'
     + homeCard('martin') + '</div>'
     +'</div>';
   h+=noteStream();
   h+='<div class="homelinks">'
     +'<button class="linkbtn" onclick="A.openReport()">Bericht &amp; PDF</button>'
+    +'<button class="linkbtn" onclick="A.openSteuer()">Steuern &amp; EÜR</button>'
+    +'<button class="linkbtn" onclick="A.openAbos()">Laufende Kosten</button>'
     +'<button class="linkbtn" onclick="A.openSettings()">Sätze &amp; Einstellungen</button>'
     +'<button class="linkbtn" onclick="A.openBackup()">Sicherung</button>'
     +'<button class="linkbtn" onclick="A.lock()">Sperren</button></div>';
@@ -928,6 +1353,26 @@ function homeCard(a){
     +zeile('Jahr '+y, sJ)
     +'</button>';
 }
+/* Die Rechnungen bekommen auf der Startseite dieselbe Karte wie ein Bereich. */
+function rechnungCard(){
+  var m=curMk(), y=curY();
+  var zeile=function(k,list){
+    var st=rgSum(list);
+    return '<div class="area-stats"><div class="area-per">'+esc(k)+'</div>'
+      +'<div><div class="stat-k">Rechnungen</div><div class="stat-v num">'+st.nRel+'</div></div>'
+      +'<div><div class="stat-k">Betrag</div><div class="stat-v num">'+eur0(st.brutto)+'</div></div>'
+      +'<div><div class="stat-k">Offen</div><div class="stat-v num" style="color:'
+      +(st.offen?'var(--red)':'var(--ink-3)')+'">'+eur0(st.offen)+'</div></div></div>';
+  };
+  return '<button class="area-card" style="--c:var(--self)" onclick="A.openRechnungen()">'
+    +'<span class="chev">›</span>'
+    +'<div class="area-name">Rechnungen</div>'
+    +'<div class="area-kind">Schreiben, nummerieren, als PDF sichern</div>'
+    +zeile(mMini(m)+' '+String(y).slice(2), rgAlive().filter(function(r){return mk(r.datum)===m;}))
+    +zeile('Jahr '+y, rgAlive().filter(function(r){return r.datum.slice(0,4)===y;}))
+    +'</button>';
+}
+
 function noteStream(){
   var ns=alive().filter(function(e){return e.notiz;})
     .sort(function(a,b){return b.date.localeCompare(a.date);}).slice(0,5);
@@ -940,6 +1385,96 @@ function noteStream(){
           +'<span class="note-date num">'+dShort(e.date)+'</span></div>'
           +'<div class="note-body">'+esc(e.notiz)+'</div></div>';
       }).join('') + '</div>';
+}
+
+/* ============ rechnungsansicht ============ */
+
+function rgSetJahr(y){ ui.rgJahr=y; render(); }
+function rgSuche(el){
+  ui.rgSuche=el.value;
+  var box=document.getElementById('rgbox');
+  if(box) box.innerHTML=rgListeHTML();
+}
+function rgGefiltert(){
+  var q=ui.rgSuche.trim().toLowerCase();
+  return rgAlive().filter(function(r){
+    if(!q && r.datum.slice(0,4)!==ui.rgJahr) return false;
+    if(q){
+      var hay=[r.nr,r.kunde.name,r.kunde.ort,r.kunde.zusatz,r.status,r.notiz]
+        .concat(r.posten.map(function(p){return p.text;})).filter(Boolean).join(' ').toLowerCase();
+      if(hay.indexOf(q)<0) return false;
+    }
+    return true;
+  }).sort(function(a,b){
+    return b.datum.localeCompare(a.datum)||String(b.nr).localeCompare(String(a.nr));
+  });
+}
+function rgListeHTML(){
+  var l=rgGefiltert(), st=rgSum(l);
+  if(!l.length) return '<div class="ledger"><div class="empty">'
+    +(ui.rgSuche?'Nichts gefunden.':'Für '+ui.rgJahr+' ist noch keine Rechnung angelegt.')+'</div></div>';
+  var h='<div class="ledger"><div class="ledger-head">'
+    +'<span class="label">'+(ui.rgSuche?'Treffer':'Rechnungen '+ui.rgJahr)+'</span>'
+    +'<span class="label">'+nStk(l.length,'Rechnung','Rechnungen')+'</span></div>'
+    +l.map(function(r){
+      var ueber=rgUeberfaellig(r);
+      return '<div class="row" onclick="A.openRg(\''+r.id+'\')">'
+        +'<button class="tick '+(r.status==='Bezahlt'?'on':'')+'" title="'
+        +(r.status==='Bezahlt'?'Wieder als gestellt führen':'Als bezahlt buchen')+'" '
+        +'onclick="A.rgBezahlt(\''+r.id+'\',event)">'+(r.status==='Bezahlt'?'✓':'')+'</button>'
+        +'<div class="row-body">'
+        +'<div class="row-l1"><span class="row-what">'
+        +'<span class="pill" style="background:var(--self);color:#fff">'+esc(r.nr||'ohne Nr.')+'</span>'
+        +esc(r.kunde.name||'—')+'</span>'
+        +'<span class="row-amt num">'+eur(rgSumme(r))+'</span></div>'
+        +'<div class="row-l2"><span class="row-meta">'
+        +esc(r.posten.map(function(p){return p.text;}).filter(Boolean)[0]||'—')+'</span>'
+        +'<span class="row-time num">'+dShort(r.datum)+'</span></div>'
+        +'<div class="row-l2"><span class="badges">'
+        +'<span class="badge"><span class="dot '+RG_DOT[r.status]+'"></span>'+esc(r.status)+'</span>'
+        +(rgLuecken(r).length?'<span class="badge"><span class="dot dot-red"></span>Pflichtangabe fehlt</span>':'')
+        +(ueber?'<span class="badge"><span class="dot dot-red"></span>überfällig seit '+dShort(rgFaellig(r))+'</span>':'')
+        +'</span><span class="row-time num">'+(rgOffen(r)?eur(rgOffen(r))+' offen':'')+'</span></div>'
+        +'</div>'
+        +'<button class="iconbtn" title="Ansehen und drucken" onclick="event.stopPropagation();A.zeigeRechnung(\''+r.id+'\')">▤</button>'
+        +'</div>';
+    }).join('');
+  h+='<div class="sumbar"><div class="sumgrid">'
+    +[['Rechnungen',String(st.nRel)],['Bezahlt',eur0(st.bezahlt)],
+      ['Offen',eur0(st.offen),st.offen?'var(--red)':''],
+      ['Überfällig',eur0(st.ueberfaellig),st.ueberfaellig?'var(--red)':'']]
+      .map(function(z){
+        return '<div class="sumcell"><div class="stat-k">'+esc(z[0])+'</div>'
+          +'<div class="stat-v num"'+(z[2]?' style="color:'+z[2]+'"':'')+'>'+esc(z[1])+'</div></div>';
+      }).join('')
+    +'</div><div class="total-row"><span class="label">Rechnungsbetrag</span>'
+    +'<span class="total-v num">'+eur(st.brutto)+'</span></div></div></div>';
+  return h;
+}
+function viewRechnungen(){
+  var js=rgJahre();
+  if(js.indexOf(ui.rgJahr)<0) js=js.concat([ui.rgJahr]).sort().reverse();
+  var h='<div class="topbar"><div class="topbar-inner"><div class="topbar-row">'
+    +'<button class="back" onclick="A.go(\'home\')">‹</button>'
+    +'<span class="topbar-title">Rechnungen</span>'
+    +'<button class="iconbtn" title="Meine Rechnungsangaben" onclick="A.openFirma()">⚙</button></div>';
+  h+='<div class="searchrow"><input id="rgq" type="search" placeholder="Nummer, Kunde, Leistung …" '
+    +'value="'+esc(ui.rgSuche)+'" oninput="A.rgSuche(this)"></div>';
+  if(!ui.rgSuche.trim()){
+    h+='<div class="chips">'+js.map(function(y){
+      return '<button class="chip '+(y===ui.rgJahr?'on':'')+'" onclick="A.rgSetJahr(\''+y+'\')">'+y+'</button>';
+    }).join('')+'</div>';
+  }else h+='<div style="height:9px"></div>';
+  h+='</div></div><div class="wrap">';
+  if(firmaLuecken().length){
+    h+='<div class="banner banner-warn">Bevor du die erste Rechnung verschickst: Es fehlt noch '
+      +esc(firmaLuecken().join(', '))+'. '
+      +'<div><button class="btn btn-line btn-sm" onclick="A.openFirma()">Angaben ergänzen</button></div></div>';
+  }
+  h+='<div id="rgbox">'+rgListeHTML()+'</div>';
+  h+='<div class="ctr"><button class="linkbtn" onclick="A.openFirma()">Meine Rechnungsangaben</button></div>';
+  h+='</div><button class="fab" onclick="A.openRg()">+ Rechnung</button>';
+  return h;
 }
 
 /* ============ bereichsansicht ============ */
@@ -1034,7 +1569,9 @@ function monatHTML(a){
       +(p.note?' · '+esc(p.note):'')+'</div></div>';
   });
   h+=monatChart(a);
-  h+='<div class="ctr"><button class="linkbtn" onclick="A.openReport()">Monatsbericht als PDF sichern</button></div>';
+  h+='<div class="ctr"><button class="linkbtn" onclick="A.openReport()">Monatsbericht als PDF sichern</button>'
+    +(a==='ausgaben'?' <button class="linkbtn" onclick="A.openAbos()">Laufende Kosten</button>':'')
+    +'</div>';
   return h;
 }
 
@@ -1153,7 +1690,9 @@ function rowHTML(e){
       : e.area==='ausgaben'
       ? '<div class="row-l2"><span class="badges">'
         +'<span class="badge"><span class="dot '+(e.beleg?'dot-good':'dot-red')+'"></span>'
-        +(e.beleg?'Beleg vorhanden':'Beleg fehlt')+'</span></span><span></span></div>'
+        +(e.beleg?'Beleg vorhanden':'Beleg fehlt')+'</span>'
+        +(e.aboId?'<span class="badge"><span class="dot dot-accent"></span>laufende Kosten</span>':'')
+        +'</span><span></span></div>'
       : '')
     +(e.notiz?'<div class="row-note">'+esc(e.notiz)+'</div>':'')
     +'</div></div>';
@@ -1213,7 +1752,7 @@ function sheetForm(){
       +'<div class="f"><label>Datum</label><input type="date" id="f-date" value="'+g('date','date',today())+'"></div></div>'
       +(errs.date?'<div class="err">'+errs.date+'</div>':'');
     b+='<div class="two"><div class="f"><label>Betrag (€)</label>'
-      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-betrag" value="'+g('betrag','betrag')+'" oninput="A.liveCalc()">'
+      +geldFeld('f-betrag',g('betrag','betrag'),' oninput="A.liveCalc()"')
       +(errs.betrag?'<div class="err">'+errs.betrag+'</div>':'')+'</div>'
       +'<div class="f"><label>Zahlungsart</label><select id="f-zahlart">'
       +optionen(ZAHLARTEN,g('zahlart','zahlart','Bankkarte'))+'</select></div></div>';
@@ -1256,7 +1795,7 @@ function sheetForm(){
   }
 
   if(ui.fArea==='martin'&&ui.fModus==='kilometer'){
-    b+='<div class="f"><label>Gefahrene Kilometer</label><input type="number" inputmode="numeric" min="0" id="f-km" value="'+g('km','km')+'" oninput="A.liveCalc()" placeholder="0">'
+    b+='<div class="f"><label>Gefahrene Kilometer</label>'+zahlFeld('f-km',g('km','km'),' oninput="A.liveCalc()"')
       +(errs.km?'<div class="err">'+errs.km+'</div>':'')+'</div>';
   }else{
     b+='<div class="f"><label>Zeit'+(ui.fArea==='self'&&ui.fBilling==='fix'?' (optional)':'')+'</label>'
@@ -1289,15 +1828,15 @@ function sheetForm(){
       +'<button class="'+(ui.fBilling==='fix'?'on':'')+'" onclick="A.setBilling(\'fix\')">Festbetrag</button>'
       +'<button class="'+(ui.fBilling==='hourly'?'on':'')+'" onclick="A.setBilling(\'hourly\')">Stundensatz</button></div>';
     if(ui.fBilling==='fix'){
-      b+='<input type="number" inputmode="decimal" step="0.01" min="0" id="f-amount" value="'+g('amount','amount')+'" oninput="A.liveCalc()" placeholder="Honorar in €">'
+      b+=geldFeld('f-amount',g('amount','amount'),' oninput="A.liveCalc()" placeholder="Honorar in €"')
         +(errs.amount?'<div class="err">'+errs.amount+'</div>':'');
     }else{
-      b+='<input type="number" inputmode="decimal" step="0.01" min="0" id="f-rate" value="'+g('rate','rate',settings.rateSelf||'')+'" oninput="A.liveCalc()" placeholder="€ pro Stunde">'
+      b+=geldFeld('f-rate',g('rate','rate',settings.rateSelf||''),' oninput="A.liveCalc()" placeholder="€ pro Stunde"')
         +(errs.rate?'<div class="err">'+errs.rate+'</div>':'');
     }
     b+='</div>';
     b+='<div class="f"><label>Anzahlung (€)</label>'
-      +'<input type="number" inputmode="decimal" step="0.01" min="0" id="f-anz" value="'+g('anz','anzahlung')+'" oninput="A.liveCalc()"></div>';
+      +geldFeld('f-anz',g('anz','anzahlung'),' oninput="A.liveCalc()"')+'</div>';
     b+='<div class="f"><label>Was</label><input type="text" id="f-was" value="'+esc(g('was','was'))+'" placeholder="z. B. Fotografische Begleitung"></div>';
     b+='<div class="f"><label>Ort</label><input type="text" id="f-ort" value="'+esc(g('ort','ort'))+'" placeholder="z. B. Schlosshof Aichach"></div>';
     b+='<div class="two"><div class="f"><label>Telefon</label><input type="tel" id="f-tel" value="'+esc(g('tel','telefon'))+'"></div>'
@@ -1306,6 +1845,18 @@ function sheetForm(){
       +'<div class="f"><label>Anzahl Fotos</label><input type="number" inputmode="numeric" min="0" id="f-fotos" value="'+g('fotos','fotos')+'"></div></div>';
     b+='<div class="f"><label>Übermittlung der Fotos</label><select id="f-ueber">'
       +optionen(UEBERGABE,g('ueber','uebergabe',UEBERGABE[0]))+'</select></div>';
+    /* Aus dem Auftrag direkt zur Rechnung – Kunde und Honorar stehen dann schon. */
+    if(ui.editId){
+      var rg=rgFuerAuftrag(ui.editId);
+      b+='<div class="btnrow" style="margin-bottom:14px">'
+        + (rg
+            ? '<button class="btn btn-line btn-sm" onclick="A.openRg(\''+rg.id+'\')">Rechnung '+esc(rg.nr)+' öffnen</button>'
+              +'<button class="btn btn-line btn-sm" onclick="A.zeigeRechnung(\''+rg.id+'\')">Rechnung ansehen</button>'
+            : '<button class="btn btn-line btn-sm" onclick="A.rgAusAuftrag(\''+ui.editId+'\')">Rechnung zu diesem Auftrag schreiben</button>')
+        +'</div>'
+        +(rg?'':'<div class="hint" style="margin-top:-8px">Kunde, Leistung und Honorar werden übernommen. '
+          +'Änderungen an diesem Auftrag bitte vorher speichern.</div>');
+    }
   }
 
   b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Besonderheiten, Absprachen …">'+esc(g('notiz','notiz'))+'</textarea></div>';
@@ -1319,7 +1870,7 @@ function sheetForm(){
 function sheetSettle(){
   var t=settleTargets(), soll=add(t.map(offenOf));
   var b='<div class="hint">'+(ui.settleScope?'Einzelner Eintrag':t.length+' offene Einträge in '+mLong(ui.month))+' · Offen <b>'+eur(soll)+'</b></div>';
-  b+='<div class="f"><label>Tatsächlich erhalten</label><input type="number" inputmode="decimal" step="0.01" id="s-amount" value="'+soll.toFixed(2)+'"></div>';
+  b+='<div class="f"><label>Tatsächlich erhalten</label>'+geldFeld('s-amount',soll)+'</div>';
   b+='<div class="f"><label>Zahlungsart</label><select id="s-method">'
     +'<option>Banküberweisung</option><option>Bar</option><option>PayPal</option><option>Sonstiges</option></select></div>';
   b+='<div class="f"><label>Zahlungsdatum</label><input type="date" id="s-date" value="'+today()+'"></div>';
@@ -1341,18 +1892,21 @@ function sheetSettings(){
       +'<button class="xbtn" title="Zeitraum entfernen" onclick="A.delSatz('+i+')">✕</button></div>'
       +'<div class="two" style="margin-top:8px">'
       +'<div><div class="satz-lab">Fotografisch €/Std</div>'
-      +'<input type="number" step="0.01" inputmode="decimal" id="sz-foto-'+i+'" value="'+s.foto+'"></div>'
+      +geldFeld('sz-foto-'+i,s.foto)+'</div>'
       +'<div><div class="satz-lab">Ausschank €/Std</div>'
-      +'<input type="number" step="0.01" inputmode="decimal" id="sz-aus-'+i+'" value="'+s.ausschank+'"></div>'
+      +geldFeld('sz-aus-'+i,s.ausschank)+'</div>'
       +'</div></div>';
   }).join('');
   b+='<button class="btn btn-line btn-sm" style="margin-bottom:16px" onclick="A.addSatz()">+ Zeitraum hinzufügen</button>';
-  b+='<div class="f"><label>Fahrtgeld (€ pro km)</label><input type="number" step="0.01" id="st-kmrate" value="'+settings.kmRate+'"></div>';
-  b+='<div class="f"><label>Erst ab … Kilometer</label><input type="number" step="1" id="st-kmfrei" value="'+settings.kmFrei+'"></div>';
-  b+='<div class="f"><label>Fahrzeit wird gezählt zu … %</label><input type="number" step="1" id="st-faktor" value="'+Math.round((settings.fahrFaktor||0)*100)+'"></div>';
-  b+='<div class="f"><label>Aufträge · Standard-Stundensatz (€)</label><input type="number" step="0.01" id="st-self" value="'+(settings.rateSelf||'')+'"></div>';
+  b+='<div class="f"><label>Fahrtgeld (€ pro km)</label>'+geldFeld('st-kmrate',settings.kmRate)+'</div>';
+  b+='<div class="f"><label>Erst ab … Kilometer</label>'+zahlFeld('st-kmfrei',settings.kmFrei)+'</div>';
+  b+='<div class="f"><label>Fahrzeit wird gezählt zu … %</label>'+zahlFeld('st-faktor',Math.round((settings.fahrFaktor||0)*100))+'</div>';
+  b+='<div class="f"><label>Aufträge · Standard-Stundensatz (€)</label>'+geldFeld('st-self',settings.rateSelf||'')+'</div>';
   b+='<div class="homelinks" style="margin-top:6px">'
-    +'<button class="linkbtn" onclick="A.openTrash()">Papierkorb ('+imPapier().length+')</button>'
+    +'<button class="linkbtn" onclick="A.openAbos()">Laufende Kosten ('+lebendeAbos().length+')</button>'
+    +'<button class="linkbtn" onclick="A.openFirma()">Meine Rechnungsangaben</button>'
+    +'<button class="linkbtn" onclick="A.openSteuer()">Steuerübersicht</button>'
+    +'<button class="linkbtn" onclick="A.openTrash()">Papierkorb ('+(imPapier().length+rgPapier().length)+')</button>'
     +'<button class="linkbtn" onclick="A.openBackup()">Sicherung</button>'
     +'<button class="linkbtn" onclick="A.openPw()">Passwort ändern</button>'
     +'<button class="linkbtn" style="color:var(--red)" onclick="A.openReset()">Alles löschen</button></div>';
@@ -1365,16 +1919,467 @@ function sheetSettings(){
   return shell('Sätze &amp; Einstellungen',b,acts);
 }
 
+/* ---- laufende Kosten ---- */
+
+function openAbos(){ ui.sheet='abos'; ui.aboId=null; ui.errs={}; render(); }
+function openAbo(id){ ui.aboId=id||null; ui.sheet='abo'; ui.errs={}; render(); }
+
+function saveAbo(){
+  var alt=ui.aboId?abos.find(function(x){return x.id===ui.aboId;}):null;
+  var a=normAbo({
+    id:ui.aboId||uid(),
+    bez:v('ab-bez').trim(), kat:v('ab-kat'), betrag:num(v('ab-betrag')),
+    haendler:v('ab-haendler').trim(), zahlart:v('ab-zahlart'),
+    intervall:v('ab-int'), tag:num(v('ab-tag')),
+    ab:v('ab-ab'), bis:v('ab-bis'),
+    beleg:!!(document.getElementById('ab-beleg')&&document.getElementById('ab-beleg').checked),
+    notiz:v('ab-notiz').trim(),
+    aktiv:alt?alt.aktiv:true,
+    erstellt:alt?alt.erstellt:nowISO(), bearbeitet:nowISO()
+  });
+  var errs={};
+  if(!a.bez) errs.bez='Bezeichnung fehlt';
+  if(!a.betrag) errs.betrag='Betrag fehlt';
+  if(!a.ab) errs.ab='Erster Monat fehlt';
+  if(a.bis&&a.bis<a.ab) errs.bis='Das Ende liegt vor dem Beginn';
+  if(Object.keys(errs).length){ ui.errs=errs; render(); return; }
+
+  if(alt) abos=abos.map(function(x){return x.id===a.id?a:x;});
+  else abos.push(a);
+  var neu=aboLauf();
+  ui.aboNeu=neu; ui.sheet='abos'; ui.aboId=null; ui.errs={};
+  render(); save();
+}
+function toggleAbo(id){
+  var a=abos.find(function(x){return x.id===id;});
+  if(!a) return;
+  a.aktiv=!a.aktiv; a.bearbeitet=nowISO();
+  if(a.aktiv) ui.aboNeu=aboLauf();
+  render(); save();
+}
+function delAbo(id){
+  var a=abos.find(function(x){return x.id===id;});
+  if(!a) return;
+  var gebucht=entries.filter(function(e){return e.aboId===id&&!e.geloescht;}).length;
+  if(!confirm('„'+a.bez+'“ aus den laufenden Kosten entfernen?\n\n'
+    +'Es wird nichts mehr gebucht. Die bereits gebuchten '+gebucht+' Posten bleiben '
+    +'erhalten – sie sind ja tatsächlich angefallen.')) return;
+  a.geloescht=true; a.aktiv=false; a.bearbeitet=nowISO();
+  render(); save();
+}
+function aboWeg(){ ui.aboNeu=0; render(); }
+
+function sheetAbos(){
+  var l=lebendeAbos().sort(function(a,b){
+    return (b.aktiv?1:0)-(a.aktiv?1:0) || a.bez.localeCompare(b.bez);
+  });
+  var jahrSumme=cent(add(l.filter(function(a){return a.aktiv;}).map(aboJahr)));
+  var b='<div class="hint">Was jeden Monat von selbst abgeht – Software-Abos, Versicherung, '
+    +'Cloud-Speicher. Einmal hinterlegt, bucht das Auftragsbuch den Posten in jedem '
+    +'fälligen Monat selbst in die Betriebsausgaben.</div>';
+  if(ui.aboNeu) b+='<div class="banner banner-ok">'+ui.aboNeu+' '
+    +(ui.aboNeu===1?'Posten wurde':'Posten wurden')+' nachgebucht. '
+    +'<button class="linkbtn" style="color:inherit" onclick="A.aboWeg()">Verstanden</button></div>';
+  b+= l.length ? l.map(function(a){
+      var monate=a.aktiv?aboMonate(a):[];
+      var naechst=a.aktiv?mPlus(monate.length?monate[monate.length-1]:a.ab,intervallSchritt(a.intervall)):'';
+      return '<div class="lrow"><div style="min-width:0">'
+        +'<div class="lrow-t">'+esc(a.bez)+(a.aktiv?'':' <span style="color:var(--ink-3);font-weight:400">· pausiert</span>')+'</div>'
+        +'<div class="lrow-s">'+eur(a.betrag)+' '+esc(intervallName(a.intervall))
+        +' · '+eur(aboJahr(a))+' im Jahr</div>'
+        +'<div class="lrow-s">'+esc(a.kat)+' · seit '+esc(mLong(a.ab))
+        +(a.bis?' bis '+esc(mLong(a.bis)):'')
+        +(a.aktiv&&naechst?' · nächste Buchung '+esc(mLong(naechst)):'')+'</div></div>'
+        +'<div class="lrow-a"><button class="btn btn-line btn-sm" onclick="A.openAbo(\''+a.id+'\')">Ändern</button>'
+        +'<button class="btn btn-line btn-sm" onclick="A.toggleAbo(\''+a.id+'\')">'+(a.aktiv?'Pause':'Weiter')+'</button>'
+        +'<button class="btn btn-line btn-sm" style="color:var(--red)" onclick="A.delAbo(\''+a.id+'\')">Ende</button></div></div>';
+    }).join('')
+    : '<div class="empty">Noch keine laufenden Kosten hinterlegt.</div>';
+  if(jahrSumme) b+='<div class="total-row" style="margin-top:14px"><span class="label">Laufend im Jahr</span>'
+    +'<span class="total-v num">'+eur(jahrSumme)+'</span></div>';
+  var acts='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Schließen</button>'
+    +'<button class="btn btn-fill" onclick="A.openAbo()">+ Kostenstelle</button></div>';
+  return shell('Laufende Kosten',b,acts);
+}
+
+function sheetAbo(){
+  var a=ui.aboId?abos.find(function(x){return x.id===ui.aboId;}):null;
+  var e=ui.errs;
+  var haendler=Array.from(new Set(areaEntries('ausgaben').map(function(x){return x.haendler;}).filter(Boolean)));
+  var b='<div class="hint">Beispiel: <b>Adobe Lightroom, 5,49 €, monatlich, ab Januar 2026</b>. '
+    +'Gebucht wird immer nur bis zum laufenden Monat – die Zukunft bleibt offen.</div>';
+  b+='<div class="f"><label>Wofür</label>'
+    +'<input type="text" id="ab-bez" value="'+esc(a?a.bez:'')+'" placeholder="z. B. Adobe Lightroom">'
+    +(e.bez?'<div class="err">'+e.bez+'</div>':'')+'</div>';
+  b+='<div class="two"><div class="f"><label>Betrag (€)</label>'
+    +geldFeld('ab-betrag',a?a.betrag:'',' oninput="A.aboCalc()"')
+    +(e.betrag?'<div class="err">'+e.betrag+'</div>':'')+'</div>'
+    +'<div class="f"><label>Rhythmus</label><select id="ab-int" onchange="A.aboCalc()">'
+    +INTERVALLE.map(function(x){
+      return '<option value="'+x[0]+'"'+((a?a.intervall:'monat')===x[0]?' selected':'')+'>'+x[1]+'</option>';
+    }).join('')+'</select></div></div>';
+  b+='<div class="calc" id="abocalc"></div>';
+  b+='<div class="two"><div class="f"><label>Kategorie</label><select id="ab-kat">'
+    +optionen(KATEGORIEN,a?a.kat:'Software & Abos')+'</select></div>'
+    +'<div class="f"><label>Zahlungsart</label><select id="ab-zahlart">'
+    +optionen(ZAHLARTEN,a?a.zahlart:'Bankkarte')+'</select></div></div>';
+  b+='<div class="two"><div class="f"><label>Erster Monat</label>'
+    +'<input type="month" id="ab-ab" value="'+esc(a?a.ab:curMk())+'" onchange="A.aboCalc()">'
+    +(e.ab?'<div class="err">'+e.ab+'</div>':'')+'</div>'
+    +'<div class="f"><label>Letzter Monat (optional)</label>'
+    +'<input type="month" id="ab-bis" value="'+esc(a?a.bis:'')+'" onchange="A.aboCalc()">'
+    +(e.bis?'<div class="err">'+e.bis+'</div>':'')+'</div></div>';
+  b+='<div class="f"><label>Am wievielten des Monats</label>'
+    +zahlFeld('ab-tag',a?a.tag:1,' onchange="A.aboCalc()"','1')
+    +'<div class="hint" style="margin:5px 0 0">Nur 1 bis 28 – diesen Tag gibt es in jedem Monat.</div></div>';
+  b+='<div class="f"><label>Anbieter</label>'
+    +'<input type="text" id="ab-haendler" list="abhl" value="'+esc(a?a.haendler:'')+'" placeholder="z. B. Adobe">'
+    +'<datalist id="abhl">'+haendler.map(function(x){return '<option value="'+esc(x)+'"></option>';}).join('')+'</datalist></div>';
+  b+='<label class="check"><input type="checkbox" id="ab-beleg" '+((a?a.beleg:true)?'checked':'')+'> '
+    +'Beleg liegt vor (z. B. monatliche Rechnung per E-Mail)</label>';
+  b+='<div class="f"><label>Notiz</label><textarea id="ab-notiz" placeholder="Vertragsnummer, Kündigungsfrist …">'
+    +esc(a?a.notiz:'')+'</textarea></div>';
+  var acts='<div class="acts">'
+    +'<button class="btn btn-line" onclick="A.openAbos()">Zurück</button>'
+    +'<button class="btn btn-fill" onclick="A.saveAbo()">Speichern</button></div>';
+  return shell(a?'Laufende Kosten ändern':'Neue laufende Kosten',b,acts);
+}
+
+/* Vorschau im Abo-Formular: was das kostet und wie viele Posten entstehen. */
+function aboCalc(){
+  var el=document.getElementById('abocalc'); if(!el) return;
+  var a=normAbo({betrag:num(v('ab-betrag')),intervall:v('ab-int'),
+                 ab:v('ab-ab')||curMk(),bis:v('ab-bis'),tag:num(v('ab-tag'))});
+  if(!a.betrag){ el.innerHTML='Betrag eintragen – dann steht hier, was im Jahr zusammenkommt.'; return; }
+  var mon=aboMonate(a), fehlt=0;
+  if(ui.aboId) mon.forEach(function(m){
+    if(!entries.some(function(x){return x.id==='abo-'+ui.aboId+'-'+m;})) fehlt++;
+  }); else fehlt=mon.length;
+  el.innerHTML='<b>'+eur(a.betrag)+'</b> '+esc(intervallName(a.intervall))
+    +' &middot; <b>'+eur(aboJahr(a))+'</b> im Jahr'
+    +(mon.length?' &middot; '+nStk(mon.length,'fälliger Monat','fällige Monate')+' seit '+esc(mLong(a.ab)):'')
+    +(fehlt?' &middot; '+nStk(fehlt,'Posten wird','Posten werden')+' nachgebucht':'');
+}
+
+/* ---- Rechnungen: anlegen und bearbeiten ---- */
+
+function openRechnungen(){ ui.view='rechnungen'; ui.rgJahr=ui.rgJahr||curY(); ui.rgSuche=''; render(); }
+
+function leereRechnung(){
+  var f=settings.firma||{};
+  return normRechnung({
+    nr:naechsteNr(), datum:today(), leistungVon:today(),
+    zahlungsziel:f.zahlungsziel, anrede:f.anrede,
+    anschreiben:f.anschreiben, schluss:f.schluss,
+    kleinunternehmer:f.kleinunternehmer!==false
+  });
+}
+function openRg(id){
+  var r=id?rechnungen.find(function(x){return x.id===id;}):null;
+  ui.rgDraft = r ? normRechnung(JSON.parse(JSON.stringify(r))) : leereRechnung();
+  ui.rgId = r?r.id:null;
+  ui.sheet='rg'; ui.errs={}; render();
+}
+/* Aus einem Auftrag heraus – Kunde, Leistung und Betrag stehen dann schon da. */
+function rgAusAuftrag(id){
+  var e=entries.find(function(x){return x.id===id;});
+  if(!e) return;
+  var r=leereRechnung();
+  r.kunde.name=e.client||'';
+  r.kunde.ort=e.ort||'';
+  r.kunde.email=e.email||'';
+  r.leistungVon=e.date; r.leistungBis=e.date;
+  r.auftragId=e.id;
+  r.anzahlung=anzOf(e);
+  r.posten=[normPosten({text:e.was||('Fotoauftrag · '+e.art), menge:1, einheit:'Pauschale', einzel:amountOf(e)})];
+  if(e.billing==='hourly'&&paidHours(e)>0)
+    r.posten=[normPosten({text:e.was||('Fotoauftrag · '+e.art), menge:Math.round(paidHours(e)*100)/100,
+                          einheit:'Std', einzel:rateOf(e)})];
+  ui.rgDraft=r; ui.rgId=null; ui.sheet='rg'; ui.errs={}; render();
+}
+
+/* Alles aus dem Formular in den Entwurf zurückschreiben – vor jedem
+   Neuzeichnen, damit Getipptes nicht verloren geht. */
+function rgLese(){
+  var r=ui.rgDraft; if(!r) return;
+  r.nr=v('rg-nr').trim(); r.datum=v('rg-datum');
+  r.leistungVon=v('rg-lvon'); r.leistungBis=v('rg-lbis');
+  r.status=v('rg-status')||'Entwurf';
+  r.zahlungsziel=Math.max(0,num(v('rg-ziel')));
+  r.anzahlung=cent(num(v('rg-anz')));
+  r.bezahltAm=v('rg-bezahlt');
+  r.kunde={name:v('rg-kname').trim(), zusatz:v('rg-kzusatz').trim(),
+           strasse:v('rg-kstr').trim(), plz:v('rg-kplz').trim(),
+           ort:v('rg-kort').trim(), email:v('rg-kmail').trim()};
+  r.anrede=v('rg-anrede'); r.anschreiben=v('rg-anschreiben'); r.schluss=v('rg-schluss');
+  r.notiz=v('rg-notiz').trim();
+  var kl=document.getElementById('rg-kl');
+  if(kl) r.kleinunternehmer=kl.checked;
+  r.posten=r.posten.map(function(p,i){
+    return normPosten({text:v('rg-t-'+i).trim(), menge:num(v('rg-m-'+i)),
+                       einheit:v('rg-e-'+i).trim(), einzel:num(v('rg-p-'+i))});
+  });
+}
+function rgPosAdd(){ rgLese(); ui.rgDraft.posten.push(normPosten({menge:1})); render(); }
+function rgPosDel(i){
+  rgLese();
+  if(ui.rgDraft.posten.length<=1) return;
+  ui.rgDraft.posten.splice(i,1); render();
+}
+function saveRg(){
+  rgLese();
+  var r=ui.rgDraft, errs={};
+  if(!r.nr) errs.nr='Rechnungsnummer fehlt';
+  else if(nrVergeben(r.nr,ui.rgId)) errs.nr='Diese Rechnungsnummer ist schon vergeben';
+  if(!r.datum) errs.datum='Rechnungsdatum fehlt';
+  if(!r.kunde.name) errs.kname='Name des Kunden fehlt';
+  if(!r.posten.some(function(p){return p.text&&postenSumme(p);})) errs.posten='Mindestens eine Position mit Betrag';
+  if(Object.keys(errs).length){ ui.errs=errs; render(); return; }
+
+  r.bearbeitet=nowISO();
+  if(ui.rgId) rechnungen=rechnungen.map(function(x){return x.id===ui.rgId?r:x;});
+  else rechnungen.push(r);
+  /* Die Nummer beim Auftrag vermerken, damit beides zusammenfindet. */
+  if(r.auftragId){
+    var e=entries.find(function(x){return x.id===r.auftragId;});
+    if(e&&e.rechnung!==r.nr){ e.rechnung=r.nr; e.bearbeitet=nowISO(); }
+  }
+  ui.rgId=null; ui.rgDraft=null; ui.editId=null; ui.sheet=null; ui.view='rechnungen';
+  ui.rgJahr=r.datum.slice(0,4);
+  render(); save();
+}
+function trashRg(){
+  if(!ui.rgId) return;
+  var r=rechnungen.find(function(x){return x.id===ui.rgId;});
+  if(!r) return;
+  if(!confirm('Rechnung '+r.nr+' in den Papierkorb legen?\n\n'
+    +'Eine gestellte Rechnung sollte nicht verschwinden – storniere sie lieber, '
+    +'dann bleibt die Nummernfolge lückenlos.')) return;
+  r.geloescht=true; r.bearbeitet=nowISO();
+  ui.rgId=null; ui.rgDraft=null; ui.sheet=null; render(); save();
+}
+function rgZurueck(id){
+  var r=rechnungen.find(function(x){return x.id===id;});
+  if(!r) return;
+  r.geloescht=false; r.bearbeitet=nowISO(); render(); save();
+}
+/* Aus der Liste heraus schnell auf „Bezahlt“ setzen. */
+function rgBezahlt(id,ev){
+  if(ev) ev.stopPropagation();
+  var r=rechnungen.find(function(x){return x.id===id;});
+  if(!r) return;
+  if(r.status==='Bezahlt'){ r.status='Gestellt'; r.bezahltAm=''; }
+  else { r.status='Bezahlt'; r.bezahltAm=today(); }
+  r.bearbeitet=nowISO(); render(); save();
+}
+
+function rgCalc(){
+  var r=ui.rgDraft; if(!r) return;
+  r.posten.forEach(function(p,i){
+    var el=document.getElementById('rg-s-'+i);
+    if(el) el.textContent=eur(cent(num(v('rg-m-'+i))*num(v('rg-p-'+i))));
+  });
+  var sum=cent(add(r.posten.map(function(p,i){return cent(num(v('rg-m-'+i))*num(v('rg-p-'+i)));})));
+  var anz=cent(num(v('rg-anz')));
+  var el=document.getElementById('rgcalc');
+  if(el) el.innerHTML='Rechnungsbetrag <b>'+eur(sum)+'</b>'
+    +(anz?' &middot; abzüglich Anzahlung '+eur(anz)+' &middot; zu zahlen <b>'+eur(cent(sum-anz))+'</b>':'')
+    +' &middot; ohne Umsatzsteuer nach § 19 UStG';
+  var lb=document.getElementById('rgluecken');
+  if(lb){
+    rgLese();
+    var f=rgLuecken(ui.rgDraft);
+    lb.innerHTML = f.length
+      ? '<div class="banner banner-warn">Für eine vollständige Rechnung fehlt noch: '+esc(f.join(', '))+'.</div>'
+      : '<div class="banner banner-ok">Alle Pflichtangaben sind vorhanden.</div>';
+  }
+}
+
+function sheetRg(){
+  var r=ui.rgDraft; if(!r) return '';
+  var e=ui.errs;
+  var kunden=Array.from(new Set(areaEntries('self').map(function(x){return x.client;}).filter(Boolean)
+    .concat(rgAlive().map(function(x){return x.kunde.name;}).filter(Boolean))));
+  var b='';
+
+  if(firmaLuecken().length){
+    b+='<div class="banner banner-warn">Deine eigenen Angaben sind noch unvollständig – es fehlt '
+      +esc(firmaLuecken().join(', '))+'. Ohne sie ist die Rechnung nicht vorschriftsmäßig. '
+      +'<div><button class="btn btn-line btn-sm" onclick="A.openFirma()">Jetzt eintragen</button></div></div>';
+  }
+
+  b+='<div class="two" style="margin-top:14px"><div class="f"><label>Rechnungsnummer</label>'
+    +'<input type="text" id="rg-nr" value="'+esc(r.nr)+'" autocomplete="off" spellcheck="false">'
+    +(e.nr?'<div class="err">'+e.nr+'</div>':'')
+    +'<div class="hint" style="margin:5px 0 0">Vorschlag – du vergibst sie selbst. Fortlaufend und nur einmal.</div></div>'
+    +'<div class="f"><label>Rechnungsdatum</label>'
+    +'<input type="date" id="rg-datum" value="'+esc(r.datum)+'" onchange="A.rgCalc()">'
+    +(e.datum?'<div class="err">'+e.datum+'</div>':'')+'</div></div>';
+
+  b+='<div class="label" style="margin:18px 0 7px">Rechnung an</div>';
+  b+='<div class="f"><label>Name</label>'
+    +'<input type="text" id="rg-kname" list="rgkl" value="'+esc(r.kunde.name)+'" placeholder="Vorname Nachname oder Firma" oninput="A.rgCalc()">'
+    +'<datalist id="rgkl">'+kunden.map(function(c){return '<option value="'+esc(c)+'"></option>';}).join('')+'</datalist>'
+    +(e.kname?'<div class="err">'+e.kname+'</div>':'')+'</div>';
+  b+='<div class="f"><label>Zusatz (optional)</label>'
+    +'<input type="text" id="rg-kzusatz" value="'+esc(r.kunde.zusatz)+'" placeholder="z. B. z. Hd. Frau Meier"></div>';
+  b+='<div class="f"><label>Straße und Hausnummer</label>'
+    +'<input type="text" id="rg-kstr" value="'+esc(r.kunde.strasse)+'" oninput="A.rgCalc()"></div>';
+  b+='<div class="two"><div class="f"><label>PLZ</label>'
+    +'<input type="text" id="rg-kplz" inputmode="numeric" value="'+esc(r.kunde.plz)+'" oninput="A.rgCalc()"></div>'
+    +'<div class="f"><label>Ort</label>'
+    +'<input type="text" id="rg-kort" value="'+esc(r.kunde.ort)+'" oninput="A.rgCalc()"></div></div>';
+  b+='<div class="f"><label>E-Mail (optional)</label>'
+    +'<input type="email" id="rg-kmail" value="'+esc(r.kunde.email)+'"></div>';
+
+  b+='<div class="label" style="margin:18px 0 7px">Leistung</div>';
+  b+='<div class="two"><div class="f"><label>Leistung erbracht am</label>'
+    +'<input type="date" id="rg-lvon" value="'+esc(r.leistungVon)+'" onchange="A.rgCalc()"></div>'
+    +'<div class="f"><label>bis (bei Zeitraum)</label>'
+    +'<input type="date" id="rg-lbis" value="'+esc(r.leistungBis)+'" onchange="A.rgCalc()"></div></div>';
+
+  b+=r.posten.map(function(p,i){ return rgPosHTML(p,i,r.posten.length); }).join('');
+  b+=(e.posten?'<div class="err" style="margin-bottom:8px">'+e.posten+'</div>':'');
+  b+='<button class="btn btn-line btn-sm" style="margin-bottom:16px" onclick="A.rgPosAdd()">+ Position</button>';
+
+  b+='<div class="two"><div class="f"><label>Bereits gezahlte Anzahlung (€)</label>'
+    +geldFeld('rg-anz',r.anzahlung,' oninput="A.rgCalc()"')+'</div>'
+    +'<div class="f"><label>Zahlungsziel (Tage)</label>'
+    +zahlFeld('rg-ziel',r.zahlungsziel,'','14')+'</div></div>';
+  b+='<div class="calc" id="rgcalc"></div>';
+  b+='<div id="rgluecken"></div>';
+
+  b+='<label class="check" style="margin-top:14px"><input type="checkbox" id="rg-kl" '
+    +(r.kleinunternehmer?'checked':'')+'> Hinweis nach § 19 UStG aufdrucken '
+    +'(keine Umsatzsteuer, Kleinunternehmerregelung)</label>';
+
+  b+='<div class="two"><div class="f"><label>Status</label><select id="rg-status">'
+    +optionen(RG_STATUS,r.status)+'</select></div>'
+    +'<div class="f"><label>Bezahlt am (optional)</label>'
+    +'<input type="date" id="rg-bezahlt" value="'+esc(r.bezahltAm)+'"></div></div>';
+
+  b+='<div class="label" style="margin:18px 0 7px">Text auf der Rechnung</div>';
+  b+='<div class="f"><label>Anrede</label>'
+    +'<input type="text" id="rg-anrede" value="'+esc(r.anrede)+'"></div>';
+  b+='<div class="f"><label>Einleitung</label><textarea id="rg-anschreiben">'+esc(r.anschreiben)+'</textarea></div>';
+  b+='<div class="f"><label>Schlusssatz</label><textarea id="rg-schluss">'+esc(r.schluss)+'</textarea></div>';
+  b+='<div class="f"><label>Interne Notiz (steht nicht auf der Rechnung)</label>'
+    +'<textarea id="rg-notiz">'+esc(r.notiz)+'</textarea></div>';
+
+  var acts='<div class="acts">'
+    +(ui.rgId?'<button class="btn btn-line" style="color:var(--red)" onclick="A.trashRg()">Papierkorb</button>':'')
+    +'<button class="btn btn-line" onclick="A.vorschauRg()">Vorschau</button>'
+    +'<button class="btn btn-fill" onclick="A.saveRg()">Speichern</button></div>';
+  return shell(ui.rgId?'Rechnung '+esc(r.nr):'Neue Rechnung',b,acts);
+}
+
+function rgPosHTML(p,i,n){
+  return '<div class="satzrow"><div class="satz-top">'
+    +'<div style="flex:1"><div class="satz-lab">Position '+(i+1)+' · Art und Umfang der Leistung</div>'
+    +'<input type="text" id="rg-t-'+i+'" value="'+esc(p.text)+'" placeholder="z. B. Fotografische Begleitung der Trauung"></div>'
+    +(n>1?'<button class="xbtn" title="Position entfernen" onclick="A.rgPosDel('+i+')">✕</button>':'')
+    +'</div><div class="three" style="margin-top:8px">'
+    +'<div><div class="satz-lab">Menge</div>'+zahlFeld('rg-m-'+i,p.menge,' oninput="A.rgCalc()"','1')+'</div>'
+    +'<div><div class="satz-lab">Einheit</div>'
+    +'<input type="text" id="rg-e-'+i+'" value="'+esc(p.einheit)+'" placeholder="Std / Stk"></div>'
+    +'<div><div class="satz-lab">Einzelpreis €</div>'+geldFeld('rg-p-'+i,p.einzel,' oninput="A.rgCalc()"')+'</div>'
+    +'<div style="text-align:right;min-width:78px"><div class="satz-lab">Summe</div>'
+    +'<div class="num" id="rg-s-'+i+'" style="font-weight:600;padding-top:8px">'+eur(postenSumme(p))+'</div></div>'
+    +'</div></div>';
+}
+
+/* ---- eigene Angaben: Absender, Steuernummer, Bankverbindung ---- */
+
+function openFirma(){ ui.sheet='firma'; ui.errs={}; render(); }
+function saveFirma(){
+  var f=Object.assign({},settings.firma||DEF_FIRMA);
+  f.name=v('fi-name').trim(); f.zusatz=v('fi-zusatz').trim();
+  f.strasse=v('fi-strasse').trim(); f.plz=v('fi-plz').trim(); f.ort=v('fi-ort').trim();
+  f.telefon=v('fi-tel').trim(); f.email=v('fi-mail').trim(); f.web=v('fi-web').trim();
+  f.steuernr=v('fi-stnr').trim(); f.ustid=v('fi-ustid').trim();
+  f.kontoinhaber=v('fi-inhaber').trim(); f.iban=v('fi-iban').trim().toUpperCase();
+  f.bic=v('fi-bic').trim().toUpperCase(); f.bank=v('fi-bank').trim();
+  f.zahlungsziel=Math.max(0,num(v('fi-ziel')));
+  f.anrede=v('fi-anrede'); f.anschreiben=v('fi-anschreiben'); f.schluss=v('fi-schluss');
+  var kl=document.getElementById('fi-kl');
+  f.kleinunternehmer=kl?kl.checked:true;
+  settings.firma=f;
+  settings.kuVorjahr=num(v('fi-kuvor'))||KU_VORJAHR;
+  settings.kuLaufend=num(v('fi-kulauf'))||KU_LAUFEND;
+  ui.sheet=null; render(); save();
+}
+function sheetFirma(){
+  var f=Object.assign({},DEF_FIRMA,settings.firma||{});
+  var b='<div class="hint">Diese Angaben stehen auf jeder Rechnung. Nach § 14 UStG gehören '
+    +'dein vollständiger Name, deine Anschrift und deine Steuernummer dazu.</div>';
+  b+='<div class="f"><label>Name (wie im Gewerbe angemeldet)</label>'
+    +'<input type="text" id="fi-name" value="'+esc(f.name)+'" placeholder="Vorname Nachname"></div>';
+  b+='<div class="f"><label>Zusatz (optional)</label>'
+    +'<input type="text" id="fi-zusatz" value="'+esc(f.zusatz)+'" placeholder="z. B. Fotografie"></div>';
+  b+='<div class="f"><label>Straße und Hausnummer</label>'
+    +'<input type="text" id="fi-strasse" value="'+esc(f.strasse)+'"></div>';
+  b+='<div class="two"><div class="f"><label>PLZ</label>'
+    +'<input type="text" id="fi-plz" inputmode="numeric" value="'+esc(f.plz)+'"></div>'
+    +'<div class="f"><label>Ort</label><input type="text" id="fi-ort" value="'+esc(f.ort)+'"></div></div>';
+  b+='<div class="two"><div class="f"><label>Telefon</label>'
+    +'<input type="tel" id="fi-tel" value="'+esc(f.telefon)+'"></div>'
+    +'<div class="f"><label>E-Mail</label><input type="email" id="fi-mail" value="'+esc(f.email)+'"></div></div>';
+  b+='<div class="f"><label>Webseite (optional)</label>'
+    +'<input type="text" id="fi-web" value="'+esc(f.web)+'"></div>';
+
+  b+='<div class="label" style="margin:18px 0 7px">Steuer</div>';
+  b+='<div class="two"><div class="f"><label>Steuernummer</label>'
+    +'<input type="text" id="fi-stnr" value="'+esc(f.steuernr)+'" placeholder="z. B. 123/456/78901"></div>'
+    +'<div class="f"><label>USt-IdNr. (falls vorhanden)</label>'
+    +'<input type="text" id="fi-ustid" value="'+esc(f.ustid)+'"></div></div>';
+  b+='<label class="check"><input type="checkbox" id="fi-kl" '+(f.kleinunternehmer?'checked':'')+'> '
+    +'Kleinunternehmer nach § 19 UStG – keine Umsatzsteuer ausweisen</label>';
+  b+='<div class="hint" style="margin-top:-4px">Neue Rechnungen tragen dann von selbst den Hinweis: '
+    +'<i>'+esc(UST19_HINWEIS)+'</i></div>';
+  b+='<div class="two"><div class="f"><label>Grenze Vorjahresumsatz (€)</label>'
+    +geldFeld('fi-kuvor',Number(settings.kuVorjahr)||KU_VORJAHR)+'</div>'
+    +'<div class="f"><label>Grenze laufendes Jahr (€)</label>'
+    +geldFeld('fi-kulauf',Number(settings.kuLaufend)||KU_LAUFEND)+'</div></div>';
+  b+='<div class="hint" style="margin-top:-4px">Stand 2025: 25.000 € im Vorjahr, 100.000 € im laufenden Jahr. '
+    +'Ändert der Gesetzgeber die Beträge, trägst du sie hier nach.</div>';
+
+  b+='<div class="label" style="margin:18px 0 7px">Bankverbindung</div>';
+  b+='<div class="f"><label>Kontoinhaber</label>'
+    +'<input type="text" id="fi-inhaber" value="'+esc(f.kontoinhaber)+'"></div>';
+  b+='<div class="f"><label>IBAN</label>'
+    +'<input type="text" id="fi-iban" value="'+esc(f.iban)+'" spellcheck="false" autocapitalize="characters"></div>';
+  b+='<div class="two"><div class="f"><label>BIC</label>'
+    +'<input type="text" id="fi-bic" value="'+esc(f.bic)+'" spellcheck="false" autocapitalize="characters"></div>'
+    +'<div class="f"><label>Bank</label><input type="text" id="fi-bank" value="'+esc(f.bank)+'"></div></div>';
+
+  b+='<div class="label" style="margin:18px 0 7px">Vorgaben für neue Rechnungen</div>';
+  b+='<div class="f"><label>Zahlungsziel (Tage)</label>'+zahlFeld('fi-ziel',f.zahlungsziel,'','14')+'</div>';
+  b+='<div class="f"><label>Anrede</label><input type="text" id="fi-anrede" value="'+esc(f.anrede)+'"></div>';
+  b+='<div class="f"><label>Einleitung</label><textarea id="fi-anschreiben">'+esc(f.anschreiben)+'</textarea></div>';
+  b+='<div class="f"><label>Schlusssatz</label><textarea id="fi-schluss">'+esc(f.schluss)+'</textarea></div>';
+
+  var acts='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
+    +'<button class="btn btn-fill" onclick="A.saveFirma()">Speichern</button></div>';
+  return shell('Meine Rechnungsangaben',b,acts);
+}
+
 function sheetTrash(){
   var t=imPapier().sort(function(a,b){return String(b.bearbeitet).localeCompare(String(a.bearbeitet));});
   var b='<div class="hint">Gelöschte Einträge bleiben hier vollständig erhalten. '
     +'Nichts verschwindet von selbst – nur du entfernst hier endgültig.</div>';
-  b+= t.length ? t.map(function(e){
+  var tr=rgPapier();
+  b+= (t.length||tr.length) ? '' : '<div class="empty">Der Papierkorb ist leer.</div>';
+  b+= t.map(function(e){
       return '<div class="lrow"><div><div class="lrow-t">'+esc(e.client||e.bez||e.was||areaKurz(e.area))+'</div>'
         +'<div class="lrow-s">'+dLang(e.date)+' · '+areaKurz(e.area)+' · '+eur(amountOf(e))+'</div></div>'
         +'<div class="lrow-a"><button class="btn btn-line btn-sm" onclick="A.restoreEntry(\''+e.id+'\')">Zurück</button>'
         +'<button class="btn btn-line btn-sm" style="color:var(--red)" onclick="A.purgeEntry(\''+e.id+'\')">Endgültig</button></div></div>';
-    }).join('') : '<div class="empty">Der Papierkorb ist leer.</div>';
+    }).join('');
+  b+= tr.map(function(r){
+      return '<div class="lrow"><div><div class="lrow-t">Rechnung '+esc(r.nr||'ohne Nr.')+'</div>'
+        +'<div class="lrow-s">'+dLang(r.datum)+' · '+esc(r.kunde.name||'—')+' · '+eur(rgSumme(r))+'</div></div>'
+        +'<div class="lrow-a"><button class="btn btn-line btn-sm" onclick="A.rgZurueck(\''+r.id+'\')">Zurück</button></div></div>';
+    }).join('');
   return shell('Papierkorb',b,'<div class="acts"><button class="btn btn-fill" onclick="A.closeSheet()">Schließen</button></div>');
 }
 
@@ -1386,6 +2391,7 @@ function sheetBackup(){
   b+='<div class="btnrow">'
     +'<button class="btn btn-line btn-sm" onclick="A.exportJSON()">Als Datei laden</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.exportCSV()">CSV-Tabelle</button>'
+    +'<button class="btn btn-line btn-sm" onclick="A.exportRgCSV()">Rechnungen als CSV</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.pickFile()">Sicherung einspielen</button>'
     +'<button class="btn btn-line btn-sm" onclick="A.openRestore()">Text einfügen</button></div>';
   b+='<div class="hint" style="margin-top:16px"><b>Arbeitszeiten aus der Excel-Liste</b><br>'
@@ -1429,16 +2435,33 @@ function sheetPw(){
   return shell('Passwort ändern',b,acts);
 }
 function sheetReport(){
-  var js=jahre(BEREICHE.indexOf(ui.repBereich)>=0?ui.repBereich:'martin');
+  var steuer=ui.repBereich==='steuer';
+  var js=jahre(BEREICHE.indexOf(ui.repBereich)>=0?ui.repBereich:'self');
   if(!ui.repJahr||js.indexOf(ui.repJahr)<0) ui.repJahr=js[0];
   if(ui.repMonat==='') ui.repMonat=String(new Date().getMonth());
   var b='<div class="hint">Bericht mit Kennzahlen, Diagrammen und der vollständigen Tabelle. '
     +'In der Vorschau auf <b>Drucken</b> und im Druckdialog „Als PDF sichern“ wählen.</div>';
   b+='<div class="f"><label>Bereich</label><select id="rp-bereich" onchange="A.repChange()">'
-    +['self','martin','ausgaben','beide'].map(function(x){
+    +['self','martin','ausgaben','beide','steuer'].map(function(x){
       return '<option value="'+x+'"'+(ui.repBereich===x?' selected':'')+'>'
-        +(x==='beide'?'Alle Bereiche':areaKurz(x))+'</option>';}).join('')
+        +(x==='beide'?'Alle Bereiche':x==='steuer'?'Steuerübersicht für ein Jahr':areaKurz(x))+'</option>';}).join('')
     +'</select></div>';
+  if(steuer){
+    b+='<div class="f"><label>Jahr</label><select id="rp-jahr" onchange="A.repChange()">'
+      +js.map(function(y){return '<option'+(ui.repJahr===y?' selected':'')+'>'+y+'</option>';}).join('')
+      +'</select></div>';
+    b+='<div class="f"><label>Einnahmen zählen</label><select id="rp-basis" onchange="A.repChange()">'
+      +'<option value="zufluss"'+(ui.stBasis!=='leistung'?' selected':'')+'>nach Zufluss – wann das Geld kam (empfohlen)</option>'
+      +'<option value="leistung"'+(ui.stBasis==='leistung'?' selected':'')+'>nach Leistungsdatum – wann gearbeitet wurde</option>'
+      +'</select></div>';
+    b+='<div class="hint">Für die Einnahmen-Überschuss-Rechnung gilt das Zuflussprinzip: '
+      +'eine Einnahme zählt in dem Jahr, in dem das Geld eingegangen ist. Die zweite '
+      +'Betrachtung steht zum Vergleich daneben.</div>';
+    b+='<div class="btnrow"><button class="btn btn-line btn-sm" onclick="A.exportSteuerCSV()">Zahlen als CSV</button></div>';
+    var acts0='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
+      +'<button class="btn btn-fill" onclick="A.zeigeSteuer()">Übersicht anzeigen</button></div>';
+    return shell('Steuerübersicht',b,acts0);
+  }
   b+='<div class="f"><label>Umfang</label><select id="rp-umfang" onchange="A.repChange()">'
     +[['monat','Einzelner Monat'],['jahr','Ganzes Jahr'],['alles','Alles (Gesamtarchiv)']].map(function(x){
       return '<option value="'+x[0]+'"'+(ui.repUmfang===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')
@@ -1458,14 +2481,23 @@ function sheetReport(){
   return shell('Bericht &amp; PDF',b,acts);
 }
 function repChange(){
+  var vorher=ui.repBereich;
   ui.repBereich=v('rp-bereich')||ui.repBereich;
+  if(document.getElementById('rp-basis')) ui.stBasis=v('rp-basis');
+  if(ui.repBereich==='steuer'){
+    ui.repUmfang='jahr';
+    if(document.getElementById('rp-jahr')) ui.repJahr=v('rp-jahr');
+    if(vorher!=='steuer') render();
+    return;
+  }
+  if(vorher==='steuer') ui.repUmfang='jahr';
   ui.repUmfang=v('rp-umfang')||ui.repUmfang;
   if(document.getElementById('rp-jahr')) ui.repJahr=v('rp-jahr');
   if(document.getElementById('rp-monat')) ui.repMonat=v('rp-monat');
   render();
 }
 function openReport(){
-  ui.repBereich=ui.view==='area'?ui.area:ui.repBereich;
+  ui.repBereich=ui.view==='area'?ui.area:(ui.repBereich==='steuer'?'self':ui.repBereich);
   ui.repUmfang=ui.view==='area'&&ui.modus==='jahr'?'jahr':'monat';
   ui.repJahr=ui.jahr||curY();
   ui.repMonat=String(Number((ui.month||curMk()).slice(5,7))-1);
@@ -1620,6 +2652,240 @@ function reportBlock(area,list,titel){
   return h;
 }
 
+/* ============ steuerübersicht ============ */
+
+function openSteuer(){
+  ui.repBereich='steuer'; ui.repUmfang='jahr';
+  ui.repJahr=ui.repJahr||curY();
+  ui.sheet='report'; render();
+}
+
+/* Die Zuflüsse eines Jahres, Zeile für Zeile – das ist die Grundlage der
+   Einnahmen-Überschuss-Rechnung und lässt sich gegen den Kontoauszug halten. */
+function zuflussZeilen(y){
+  var out=[];
+  ['self','martin'].forEach(function(a){
+    areaEntries(a).forEach(function(e){
+      einnahmePosten(e).forEach(function(z){
+        if(z.datum.slice(0,4)!==y) return;
+        out.push({datum:z.datum, bereich:a, art:z.art, genau:z.genau, betrag:z.betrag,
+                  wer:a==='self'?(e.client||'—'):(e.name||e.was||'—'),
+                  was:e.was||(a==='self'?e.art:artLabel(e)), id:e.id});
+      });
+    });
+  });
+  return out.sort(function(x,y2){return x.datum.localeCompare(y2.datum);});
+}
+
+function steuerReportHTML(y,basis){
+  var st=steuerJahr(y,basis);
+  var ku=kuLage(st);
+  var zufluss=basis==='zufluss';
+  var acc=areaHex('self');
+
+  var h='<div class="rep-head"><div><h1>Auftragsbuch</h1>'
+    +'<div class="rep-sub">Steuerübersicht · Jahr '+esc(y)+' · '
+    +(zufluss?'Zuflussprinzip':'nach Leistungsdatum')+'</div></div>'
+    +'<div class="rep-meta">Erstellt am '+esc(stamp())+'<br>'
+    +'Gewinn '+eur(st.gewinn)+'<br>Vorbereitung für die Steuererklärung</div></div>';
+
+  h+='<div class="rep-sec"><h2>Einnahmen-Überschuss-Rechnung · Selbstständigkeit</h2><div class="rep-tiles">'
+    +repTile('Betriebseinnahmen',eur(st.einnahmen),zufluss?'im Jahr eingegangen':'im Jahr geleistet')
+    +repTile('Betriebsausgaben',eur(st.ausgaben),nStk(st.ausgListe.length,'Posten','Posten'))
+    +repTile('Gewinn',eur(st.gewinn),'Einnahmen minus Ausgaben')
+    +repTile('Ohne Beleg',eur(st.ohneBeleg),st.ohneBeleg?'Belege nachreichen':'alles belegt')
+    +repTile('Noch offen',eur(st.offen),'aus Aufträgen dieses Jahres')
+    +repTile('Bruttoarbeitslohn',eur(st.lohn),'Anstellung · Anlage N')
+    +'</div></div>';
+
+  h+='<div class="rep-sec"><h2>Wohin die Zahlen in der Steuererklärung gehören</h2>'
+    +'<table class="rep-table"><thead><tr><th>Betrag</th><th>Bezeichnung</th><th>Formular</th></tr></thead><tbody>'
+    +'<tr><td class="rep-r">'+eur(st.einnahmen)+'</td>'
+    +'<td>Betriebseinnahmen – umsatzsteuerfrei nach § 19 UStG</td>'
+    +'<td>Anlage EÜR, Abschnitt Betriebseinnahmen</td></tr>'
+    +'<tr><td class="rep-r">'+eur(st.ausgaben)+'</td><td>Betriebsausgaben (Aufteilung siehe unten)</td>'
+    +'<td>Anlage EÜR, Abschnitt Betriebsausgaben</td></tr>'
+    +'<tr><td class="rep-r">'+eur(st.gewinn)+'</td><td>Gewinn aus der selbstständigen Tätigkeit</td>'
+    +'<td>Anlage EÜR und Anlage S bzw. G</td></tr>'
+    +'<tr><td class="rep-r">'+eur(st.lohn)+'</td><td>Bruttoarbeitslohn aus der Anstellung</td>'
+    +'<td>Anlage N – maßgeblich ist die Lohnsteuerbescheinigung</td></tr>'
+    +'</tbody></table>'
+    +'<p class="rep-note">Die Zeilennummern der Formulare ändern sich von Jahr zu Jahr; deshalb '
+    +'steht hier der Abschnitt statt einer Zeile.</p></div>';
+
+  h+='<div class="rep-sec"><h2>Kleinunternehmerregelung nach § 19 UStG</h2>'
+    +'<table class="rep-table"><tbody>'
+    +'<tr><td>Vereinnahmter Umsatz '+esc(String(Number(y)-1))+' (Vorjahr)</td>'
+    +'<td class="rep-r">'+eur(st.umsatzVor)+'</td><td>Grenze '+eur0(st.grenzeVor)+'</td></tr>'
+    +'<tr><td>Vereinnahmter Umsatz '+esc(y)+'</td>'
+    +'<td class="rep-r">'+eur(st.umsatz)+'</td><td>Grenze '+eur0(st.grenzeLauf)+'</td></tr>'
+    +'</tbody></table>'
+    +'<p class="rep-note">'+esc(ku.text)+'</p></div>';
+
+  if(st.nachKat.length){
+    h+='<div class="rep-sec"><h2>Betriebsausgaben nach Kategorie</h2>'
+      +'<div class="rep-cols"><div><table class="rep-table"><thead><tr>'
+      +'<th>Kategorie</th><th class="rep-r">Posten</th><th class="rep-r">Betrag</th>'
+      +'<th class="rep-r">Anteil</th></tr></thead><tbody>'
+      +st.nachKat.slice().sort(function(a,b){return b.betrag-a.betrag;}).map(function(k){
+        return '<tr><td>'+esc(k.kat)+'</td><td class="rep-r">'+k.n+'</td>'
+          +'<td class="rep-r">'+eur(k.betrag)+'</td>'
+          +'<td class="rep-r">'+(st.ausgaben?Math.round(k.betrag/st.ausgaben*100):0)+' %</td></tr>';
+      }).join('')
+      +'</tbody><tfoot><tr><td>SUMME</td><td class="rep-r">'+st.ausgListe.length+'</td>'
+      +'<td class="rep-r">'+eur(st.ausgaben)+'</td><td></td></tr></tfoot></table></div>'
+      +'<div>'+rowChart(st.nachKat.map(function(k){
+          return {label:k.kat,value:k.betrag,tip:nStk(k.n,'Posten','Posten')};
+        }),{width:480,color:areaHex('ausgaben'),aria:'Betriebsausgaben nach Kategorie'})
+      +'</div></div></div>';
+  }
+
+  if(zufluss){
+    var zl=zuflussZeilen(y).filter(function(z){return z.bereich==='self';});
+    h+='<div class="rep-sec"><h2>Betriebseinnahmen · einzelne Zuflüsse</h2>';
+    h+= zl.length
+      ? '<table class="rep-table"><thead><tr><th>Datum</th><th>Kunde</th><th>Leistung</th>'
+        +'<th>Art</th><th>Datum belegt</th><th class="rep-r">Betrag</th></tr></thead><tbody>'
+        +zl.map(function(z){
+          return '<tr><td>'+dShort(z.datum)+'</td><td>'+esc(z.wer)+'</td><td>'+esc(z.was)+'</td>'
+            +'<td>'+esc(z.art)+'</td><td>'+(z.genau?'ja':'ersatzweise Auftragsdatum')+'</td>'
+            +'<td class="rep-r">'+eur(z.betrag)+'</td></tr>';
+        }).join('')
+        +'</tbody><tfoot><tr><td colspan="5">SUMME</td><td class="rep-r">'+eur(st.einnahmen)+'</td></tr></tfoot></table>'
+      : '<p class="rep-note">In diesem Jahr ist aus der Selbstständigkeit nichts eingegangen.</p>';
+    if(st.einnahmenUngenau)
+      h+='<p class="rep-note">Davon '+esc(eur(st.einnahmenUngenau))+' ohne hinterlegtes Zahlungsdatum – '
+        +'dort steht ersatzweise das Datum des Auftrags. Wenn es auf den Monat ankommt, '
+        +'trage das Zahlungsdatum beim Abrechnen nach.</p>';
+    h+='<p class="rep-note">Nach dem Leistungsdatum gerechnet wären es '+esc(eur(st.einnahmenAndere))+'.</p></div>';
+  }else{
+    var ll=yearEntries('self',y).filter(zaehlt);
+    h+='<div class="rep-sec"><h2>Betriebseinnahmen · Aufträge des Jahres</h2>';
+    h+= ll.length
+      ? '<table class="rep-table"><thead><tr><th>Datum</th><th>Kunde</th><th>Auftragsart</th>'
+        +'<th>Rechnungsnr.</th><th>Zahlung</th><th class="rep-r">Honorar</th></tr></thead><tbody>'
+        +ll.map(function(e){
+          return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.client||'')+'</td><td>'+esc(e.art)+'</td>'
+            +'<td>'+esc(e.rechnung||'')+'</td><td>'+esc(zahlStatus(e))+'</td>'
+            +'<td class="rep-r">'+eur(amountOf(e))+'</td></tr>';
+        }).join('')
+        +'</tbody><tfoot><tr><td colspan="5">SUMME</td><td class="rep-r">'+eur(st.einnahmen)+'</td></tr></tfoot></table>'
+      : '<p class="rep-note">In diesem Jahr wurde kein Auftrag erfasst.</p>';
+    h+='<p class="rep-note">Nach dem Zuflussprinzip gerechnet wären es '+esc(eur(st.einnahmenAndere))+'. '
+      +'Für die Einnahmen-Überschuss-Rechnung ist der Zufluss maßgeblich.</p></div>';
+  }
+
+  h+='<div class="rep-sec"><h2>Alle Betriebsausgaben des Jahres</h2>';
+  h+= st.ausgListe.length
+    ? '<table class="rep-table"><thead><tr><th>Datum</th><th>Bezeichnung</th><th>Kategorie</th>'
+      +'<th>Anbieter</th><th>Zahlungsart</th><th>Beleg</th><th>Herkunft</th>'
+      +'<th class="rep-r">Betrag</th></tr></thead><tbody>'
+      +st.ausgListe.map(function(e){
+        return '<tr><td>'+dShort(e.date)+'</td><td>'+esc(e.bez||'')+'</td><td>'+esc(e.kat)+'</td>'
+          +'<td>'+esc(e.haendler||'')+'</td><td>'+esc(e.zahlart||'')+'</td>'
+          +'<td>'+(e.beleg?'✓':'fehlt')+'</td>'
+          +'<td>'+(e.aboId?'laufende Kosten':'einzeln erfasst')+'</td>'
+          +'<td class="rep-r">'+eur(amountOf(e))+'</td></tr>';
+      }).join('')
+      +'</tbody><tfoot><tr><td colspan="7">SUMME</td><td class="rep-r">'+eur(st.ausgaben)+'</td></tr></tfoot></table>'
+    : '<p class="rep-note">In diesem Jahr wurde keine Betriebsausgabe erfasst.</p>';
+  h+='</div>';
+
+  if(st.rg.length){
+    h+='<div class="rep-sec"><h2>Rechnungen des Jahres</h2><table class="rep-table"><thead><tr>'
+      +'<th>Nummer</th><th>Datum</th><th>Kunde</th><th>Leistungszeitpunkt</th><th>Status</th>'
+      +'<th class="rep-r">Betrag</th><th class="rep-r">Offen</th></tr></thead><tbody>'
+      +st.rg.slice().sort(function(a,b){return a.datum.localeCompare(b.datum);}).map(function(r){
+        return '<tr'+(r.status==='Storniert'?' style="color:#9A938A"':'')+'>'
+          +'<td>'+esc(r.nr)+'</td><td>'+dShort(r.datum)+'</td><td>'+esc(r.kunde.name||'')+'</td>'
+          +'<td>'+esc(rgLeistungText(r))+'</td><td>'+esc(r.status)+'</td>'
+          +'<td class="rep-r">'+eur(rgSumme(r))+'</td>'
+          +'<td class="rep-r">'+(rgOffen(r)?eur(rgOffen(r)):'—')+'</td></tr>';
+      }).join('')
+      +'</tbody><tfoot><tr><td colspan="5">SUMME (ohne Stornos)</td>'
+      +'<td class="rep-r">'+eur(st.rgSum.brutto)+'</td>'
+      +'<td class="rep-r">'+eur(st.rgSum.offen)+'</td></tr></tfoot></table>'
+      +'<p class="rep-note">Die Rechnungsnummern sollten lückenlos aufeinander folgen. '
+      +'Eine Rechnung, die nicht gilt, wird storniert statt gelöscht.</p></div>';
+  }
+
+  var lohnListe=yearEntries('martin',y);
+  if(lohnListe.length){
+    h+='<div class="rep-sec"><h2>Anstellung · Anlage N</h2><div class="rep-tiles">'
+      +repTile('Bruttoarbeitslohn',eur(st.lohn),zufluss?'im Jahr zugeflossen':'im Jahr gearbeitet')
+      +repTile('Zeilen',String(lohnListe.length),'erfasste Einträge')
+      +repTile('Gefahrene km',dec2(add(lohnListe.map(kmOf)))+' km','für das Fahrtgeld')
+      +'</div><p class="rep-note">Für die Anlage N zählt die Lohnsteuerbescheinigung des Arbeitgebers. '
+      +'Diese Summe dient dem Abgleich – weicht sie ab, klärt sich das meist über den '
+      +'Zahlungszeitpunkt am Jahreswechsel.</p></div>';
+  }
+
+  h+='<div class="rep-sec"><h2>Was noch zu tun ist</h2><ul class="rep-liste">'
+    +(st.ohneBeleg?'<li>Belege über '+esc(eur(st.ohneBeleg))+' nachreichen und abheften.</li>':'')
+    +(st.offen?'<li>'+esc(eur(st.offen))+' aus Aufträgen dieses Jahres sind noch offen – erst der Eingang zählt als Einnahme.</li>':'')
+    +(st.rgSum.ueberfaellig?'<li>'+esc(eur(st.rgSum.ueberfaellig))+' an Rechnungen sind überfällig.</li>':'')
+    +(st.einnahmenUngenau?'<li>Bei '+esc(eur(st.einnahmenUngenau))+' fehlt das Zahlungsdatum.</li>':'')
+    +(firmaLuecken().length?'<li>Eigene Rechnungsangaben ergänzen: '+esc(firmaLuecken().join(', '))+'.</li>':'')
+    +'<li>Aufbewahrungsfrist beachten: Belege und Aufzeichnungen gehören zehn Jahre aufgehoben.</li>'
+    +'</ul></div>';
+
+  h+='<div class="rep-sec"><h2>Hinweis</h2><p class="rep-note">'
+    +'Diese Übersicht fasst zusammen, was in diesem Auftragsbuch erfasst ist. Sie ist keine '
+    +'Steuerberatung und ersetzt weder die Steuererklärung noch die Prüfung durch eine '
+    +'steuerberatende Person. Ob ein Posten abziehbar ist und in welchem Jahr er zählt, '
+    +'entscheidet der Einzelfall.</p></div>';
+
+  h+='<div class="rep-foot"><span>Auftragsbuch · Steuerübersicht '+esc(y)+'</span>'
+    +'<span>Erstellt am '+esc(stamp())+'</span></div>';
+  return h;
+}
+
+/* Die Zahlen als Tabelle – zum Weiterreichen an die Steuerberatung. */
+function exportSteuerCSV(){
+  var y=ui.repJahr||curY(), st=steuerJahr(y,ui.stBasis);
+  var q=function(x){return '"'+String(x==null?'':x).replace(/"/g,'""')+'"';};
+  var z=[];
+  z.push(['Abschnitt','Bezeichnung','Betrag'].map(q).join(';'));
+  z.push(['Übersicht','Betriebseinnahmen '+y,dec2(st.einnahmen)].map(q).join(';'));
+  z.push(['Übersicht','Betriebsausgaben '+y,dec2(st.ausgaben)].map(q).join(';'));
+  z.push(['Übersicht','Gewinn '+y,dec2(st.gewinn)].map(q).join(';'));
+  z.push(['Übersicht','Bruttoarbeitslohn '+y,dec2(st.lohn)].map(q).join(';'));
+  z.push(['§ 19 UStG','Vereinnahmter Umsatz '+(Number(y)-1),dec2(st.umsatzVor)].map(q).join(';'));
+  z.push(['§ 19 UStG','Vereinnahmter Umsatz '+y,dec2(st.umsatz)].map(q).join(';'));
+  st.nachKat.forEach(function(k){
+    z.push(['Betriebsausgaben',k.kat,dec2(k.betrag)].map(q).join(';'));
+  });
+  z.push('');
+  z.push(['Einnahmen · Zufluss','Datum','Bereich','Kunde','Leistung','Art','Datum belegt','Betrag'].map(q).join(';'));
+  zuflussZeilen(y).forEach(function(x){
+    z.push(['',dLang(x.datum),areaKurz(x.bereich),x.wer,x.was,x.art,x.genau?'ja':'nein',dec2(x.betrag)]
+      .map(q).join(';'));
+  });
+  z.push('');
+  z.push(['Betriebsausgaben','Datum','Bezeichnung','Kategorie','Anbieter','Zahlungsart','Beleg','Herkunft','Betrag'].map(q).join(';'));
+  st.ausgListe.forEach(function(e){
+    z.push(['',dLang(e.date),e.bez||'',e.kat,e.haendler||'',e.zahlart||'',e.beleg?'ja':'nein',
+            e.aboId?'laufende Kosten':'einzeln',dec2(amountOf(e))].map(q).join(';'));
+  });
+  download('Auftragsbuch-Steuer-'+y+'.csv','﻿'+z.join('\r\n'),'text/csv;charset=utf-8');
+}
+
+function zeigeSteuer(){
+  repChange();
+  var y=ui.repJahr||curY();
+  if(settings.steuerBasis!==ui.stBasis){ settings.steuerBasis=ui.stBasis; save(); }
+  document.getElementById('report').innerHTML=steuerReportHTML(y,ui.stBasis);
+  document.getElementById('report').classList.remove('rechnung');
+  seitenFormat('quer');
+  document.getElementById('reportbar-t').textContent='Vorschau · Steuerübersicht '+y;
+  ui.sheet=null; ui.repOffen=true;
+  document.body.classList.add('report-open');
+  document.getElementById('report').hidden=false;
+  document.getElementById('reportbar').hidden=false;
+  render();
+  window.scrollTo(0,0);
+}
+
 function showReport(){
   repChange();
   var bereiche = ui.repBereich==='beide' ? BEREICHE : [ui.repBereich];
@@ -1710,6 +2976,8 @@ function showReport(){
   h+='<div class="rep-foot"><span>Auftragsbuch · '+esc(titel)+'</span><span>Erstellt am '+esc(stamp())+'</span></div>';
 
   document.getElementById('report').innerHTML=h;
+  document.getElementById('report').classList.remove('rechnung');
+  seitenFormat('quer');
   document.getElementById('reportbar-t').textContent='Vorschau · '+kurz+' '+titel;
   ui.sheet=null; ui.repOffen=true;
   document.body.classList.add('report-open');
@@ -1718,9 +2986,116 @@ function showReport(){
   render();
   window.scrollTo(0,0);
 }
+/* ============ rechnung als PDF ============
+   Berichte werden quer gedruckt, eine Rechnung hochkant. Die Seitengröße
+   steht in einem eigenen Stil-Element, das die Vorgabe aus app.css
+   überschreibt – so gilt für jede Ansicht das passende Format.
+   ================================================================== */
+
+function seitenFormat(f){
+  var el=document.getElementById('pageformat');
+  if(!el){ el=document.createElement('style'); el.id='pageformat'; document.head.appendChild(el); }
+  el.textContent = f==='hoch'
+    ? '@media print{@page{size:A4 portrait;margin:16mm 18mm 14mm;}}'
+    : '@media print{@page{size:A4 landscape;margin:11mm;}}';
+}
+
+function zeile(x){ return x?esc(x)+'<br>':''; }
+
+function rechnungHTML(r){
+  var f=Object.assign({},DEF_FIRMA,settings.firma||{});
+  var sum=rgSumme(r), anz=cent(Number(r.anzahlung)||0), zahlbar=cent(sum-anz);
+  var absender=[f.name,f.zusatz,f.strasse,(f.plz+' '+f.ort).trim()].filter(Boolean).join(' · ');
+  var faellig=rgFaellig(r);
+  var luecken=rgLuecken(r);
+
+  var h='';
+  if(luecken.length){
+    h+='<div class="rg-warn">Diese Rechnung ist noch nicht vollständig. Es fehlt: '
+      +esc(luecken.join(', '))+'. Der Hinweis erscheint nur am Bildschirm, nicht im Druck.</div>';
+  }
+  h+='<div class="rg-abs">'+esc(absender||'— eigene Angaben fehlen —')+'</div>';
+  h+='<div class="rg-kopf"><div class="rg-adr">'
+    + zeile(r.kunde.name) + zeile(r.kunde.zusatz) + zeile(r.kunde.strasse)
+    + zeile((r.kunde.plz+' '+r.kunde.ort).trim())
+    +'</div><table class="rg-daten"><tbody>'
+    +'<tr><td>Rechnungsnummer</td><td>'+esc(r.nr||'—')+'</td></tr>'
+    +'<tr><td>Rechnungsdatum</td><td>'+dLang(r.datum)+'</td></tr>'
+    +'<tr><td>Leistungszeitpunkt</td><td>'+esc(rgLeistungText(r))+'</td></tr>'
+    +(f.steuernr?'<tr><td>Steuernummer</td><td>'+esc(f.steuernr)+'</td></tr>':'')
+    +(f.ustid?'<tr><td>USt-IdNr.</td><td>'+esc(f.ustid)+'</td></tr>':'')
+    +'</tbody></table></div>';
+
+  h+='<h1 class="rg-titel">Rechnung'+(r.nr?' Nr. '+esc(r.nr):'')+'</h1>';
+  if(r.status==='Storniert') h+='<p class="rg-storno">Diese Rechnung wurde storniert.</p>';
+  if(r.anrede) h+='<p class="rg-p">'+esc(r.anrede)+'</p>';
+  if(r.anschreiben) h+='<p class="rg-p">'+esc(r.anschreiben)+'</p>';
+
+  h+='<table class="rg-pos"><thead><tr><th>Pos.</th><th>Art und Umfang der Leistung</th>'
+    +'<th class="rep-r">Menge</th><th class="rep-r">Einzelpreis</th><th class="rep-r">Betrag</th></tr></thead><tbody>'
+    +r.posten.filter(function(p){return p.text||postenSumme(p);}).map(function(p,i){
+      return '<tr><td>'+(i+1)+'</td><td>'+esc(p.text||'—')+'</td>'
+        +'<td class="rep-r">'+dec2(p.menge)+(p.einheit?' '+esc(p.einheit):'')+'</td>'
+        +'<td class="rep-r">'+eur(p.einzel)+'</td>'
+        +'<td class="rep-r">'+eur(postenSumme(p))+'</td></tr>';
+    }).join('')
+    +'</tbody></table>';
+
+  h+='<table class="rg-summen"><tbody>'
+    +(anz?'<tr><td>Summe der Leistungen</td><td class="rep-r">'+eur(sum)+'</td></tr>'
+         +'<tr><td>abzüglich bereits gezahlter Anzahlung</td><td class="rep-r">− '+eur(anz)+'</td></tr>':'')
+    +'<tr class="rg-gesamt"><td>'+(anz?'Noch zu zahlen':'Rechnungsbetrag')+'</td>'
+    +'<td class="rep-r">'+eur(anz?zahlbar:sum)+'</td></tr>'
+    +'</tbody></table>';
+
+  if(r.kleinunternehmer) h+='<p class="rg-19">'+esc(UST19_HINWEIS)+'</p>';
+
+  var bank=[f.kontoinhaber?'Kontoinhaber '+f.kontoinhaber:'',f.iban?'IBAN '+f.iban:'',
+            f.bic?'BIC '+f.bic:'',f.bank].filter(Boolean).join(' · ');
+  h+='<p class="rg-p">'+(r.status==='Bezahlt'&&r.bezahltAm
+      ? 'Der Betrag ist am '+dLang(r.bezahltAm)+' eingegangen. Vielen Dank.'
+      : 'Bitte überweisen Sie den Betrag ohne Abzug bis zum <b>'+dLang(faellig)+'</b>'
+        +(bank?' auf folgendes Konto: '+esc(bank):'')+'.')+'</p>';
+  if(r.schluss) h+='<p class="rg-p">'+esc(r.schluss)+'</p>';
+  h+='<p class="rg-p rg-gruss">Mit freundlichen Grüßen<br><br>'+esc(f.name)+'</p>';
+
+  h+='<div class="rg-fuss">'
+    +'<div>'+zeile(f.name)+zeile(f.zusatz)+zeile(f.strasse)+zeile((f.plz+' '+f.ort).trim())+'</div>'
+    +'<div>'+zeile(f.telefon)+zeile(f.email)+zeile(f.web)+'</div>'
+    +'<div>'+(f.steuernr?'Steuernummer '+esc(f.steuernr)+'<br>':'')
+    +(f.ustid?'USt-IdNr. '+esc(f.ustid)+'<br>':'')
+    +(f.iban?esc(f.iban)+'<br>':'')+(f.bank?esc(f.bank):'')+'</div></div>';
+  return h;
+}
+
+function zeigeRgObjekt(r){
+  var rep=document.getElementById('report');
+  rep.innerHTML=rechnungHTML(r);
+  rep.classList.add('rechnung');
+  seitenFormat('hoch');
+  document.getElementById('reportbar-t').textContent='Rechnung '+(r.nr||'ohne Nummer')
+    +' · '+(r.kunde.name||'ohne Kunde');
+  ui.repOffen=true;
+  document.body.classList.add('report-open');
+  rep.hidden=false;
+  document.getElementById('reportbar').hidden=false;
+  window.scrollTo(0,0);
+}
+function zeigeRechnung(id){
+  var r=rechnungen.find(function(x){return x.id===id;});
+  if(r) zeigeRgObjekt(normRechnung(r));
+}
+/* Vorschau aus dem offenen Formular – noch ohne zu speichern. */
+function vorschauRg(){
+  rgLese();
+  if(ui.rgDraft) zeigeRgObjekt(ui.rgDraft);
+}
+
 function closeReport(){
   ui.repOffen=false;
   document.body.classList.remove('report-open');
+  document.getElementById('report').classList.remove('rechnung');
+  seitenFormat('quer');
   document.getElementById('report').hidden=true;
   document.getElementById('reportbar').hidden=true;
 }
@@ -1797,7 +3172,7 @@ function changePw(){
     .catch(function(){ er.textContent='Das aktuelle Passwort ist nicht korrekt.'; });
 }
 function lock(){
-  cryptoKey=null; entries=[]; payments=[];
+  cryptoKey=null; entries=[]; payments=[]; rechnungen=[]; abos=[];
   closeReport(); ui.sheet=null;
   gate('enter',null,meta&&meta.hint);
 }
@@ -1813,7 +3188,12 @@ function resetLock(){
 /* Nach Anlegen und nach jedem Entsperren auf der Startseite beginnen. */
 function boot(){
   ui.view='home'; ui.month=curMk(); ui.jahr=curY(); ui.modus='monat';
+  ui.rgJahr=curY(); ui.stBasis=settings.steuerBasis||'zufluss';
+  /* Was seit dem letzten Start fällig wurde, wird jetzt gebucht. */
+  var neu=aboLauf();
+  ui.aboNeu=neu;
   render(); resetLock(); autoImport();
+  if(neu) save();
 }
 
 function render(){
@@ -1821,12 +3201,16 @@ function render(){
   document.documentElement.style.setProperty('--accent', areaFarbe(ui.area));
   document.documentElement.style.setProperty('--accent-soft',
     ui.area==='self'?'var(--self-soft)':ui.area==='ausgaben'?'var(--gold-soft)':'var(--martin-soft)');
-  var h = ui.view==='home' ? viewHome() : viewArea();
+  var h = ui.view==='home' ? viewHome() : ui.view==='rechnungen' ? viewRechnungen() : viewArea();
   h += ui.sheet==='form'? sheetForm() : ui.sheet==='settle'? sheetSettle() : ui.sheet==='settings'? sheetSettings()
      : ui.sheet==='backup'? sheetBackup() : ui.sheet==='restore'? sheetRestore() : ui.sheet==='reset'? sheetReset()
-     : ui.sheet==='trash'? sheetTrash() : ui.sheet==='pw'? sheetPw() : ui.sheet==='report'? sheetReport() : '';
+     : ui.sheet==='trash'? sheetTrash() : ui.sheet==='pw'? sheetPw() : ui.sheet==='report'? sheetReport()
+     : ui.sheet==='abos'? sheetAbos() : ui.sheet==='abo'? sheetAbo()
+     : ui.sheet==='rg'? sheetRg() : ui.sheet==='firma'? sheetFirma() : '';
   document.getElementById('app').innerHTML=h;
   if(ui.sheet==='form') liveCalc();
+  if(ui.sheet==='abo') aboCalc();
+  if(ui.sheet==='rg') rgCalc();
   resetLock();
 }
 
@@ -1843,7 +3227,15 @@ window.A={
   openTrash:openTrash,legacyEntfernen:legacyEntfernen,aktualisieren:aktualisieren,xlWeg:xlWeg,
   openReset:openReset,checkWipe:checkWipe,doWipe:doWipe,
   openPw:openPw,changePw:changePw,setPw:setPw,checkPw:checkPw,
-  openReport:openReport,repChange:repChange,showReport:showReport,closeReport:closeReport
+  openReport:openReport,repChange:repChange,showReport:showReport,closeReport:closeReport,
+  openAbos:openAbos,openAbo:openAbo,saveAbo:saveAbo,toggleAbo:toggleAbo,delAbo:delAbo,
+  aboCalc:aboCalc,aboWeg:aboWeg,
+  openRechnungen:openRechnungen,openRg:openRg,saveRg:saveRg,trashRg:trashRg,rgZurueck:rgZurueck,
+  rgPosAdd:rgPosAdd,rgPosDel:rgPosDel,rgCalc:rgCalc,rgBezahlt:rgBezahlt,rgAusAuftrag:rgAusAuftrag,
+  rgSetJahr:rgSetJahr,rgSuche:rgSuche,zeigeRechnung:zeigeRechnung,vorschauRg:vorschauRg,
+  exportRgCSV:exportRgCSV,
+  openFirma:openFirma,saveFirma:saveFirma,
+  openSteuer:openSteuer,zeigeSteuer:zeigeSteuer,exportSteuerCSV:exportSteuerCSV
 };
 
 function start(){
