@@ -1,8 +1,8 @@
 /* Service Worker – macht das Auftragsbuch offline verfügbar.
    Die Version bei jeder Änderung hochzählen, damit alte Dateien weichen. */
-var CACHE = 'auftragsbuch-v13';
+var CACHE = 'auftragsbuch-v14';
 var ASSETS = [
-  './', './index.html', './app.css?v=13', './app.js?v=13', './manifest.json',
+  './', './index.html', './app.css?v=14', './app.js?v=14', './manifest.json',
   './daten/martin-arbeitszeit.json',
   './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png', './icon-512-maskable.png'
 ];

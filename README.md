@@ -565,6 +565,14 @@ Gelesen werden `5,49`, `5.49`, `1.234,56` und `1 234,56`; entscheidend ist das
 zuletzt stehende Trennzeichen. Jeder eingegebene Betrag wird auf volle Cent
 gerundet, damit sich keine Reste wie `5,490000000000001` durchs Rechnen ziehen.
 
+**Blätter auf dem Handy.** `100vh` ist dort größer als das, was man sieht: die
+Adressleiste des Browsers und die eingeblendete Tastatur zählen nicht mit. Ein
+Blatt mit `max-height:90vh` ragte deshalb oben aus dem Bild – mitsamt der Zeile
+mit dem ✕, die sich durch kein Scrollen mehr erreichen ließ. Die App misst den
+wirklich sichtbaren Bereich über `visualViewport` und setzt daraus `--sheetmax`;
+`dvh` und `vh` bleiben als Rückfall. Zusätzlich gibt es aus jedem langen Blatt
+einen zweiten Ausgang: **Abbrechen** ganz unten und die **Esc**-Taste.
+
 **Seitenumbruch der Rechnung.** Browser beherrschen kein CSS Paged Media und
 können deshalb keine Seitenzahl in ein Dokument schreiben. Die App verteilt die
 Rechnung darum selbst auf A4-Seiten: Sie misst die Bausteine auf einem

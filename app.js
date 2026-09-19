@@ -75,7 +75,7 @@ var DEF_FIRMA={
 var KU_VORJAHR=25000, KU_LAUFEND=100000;
 
 var IMPORT_DATEI='daten/martin-arbeitszeit.json';
-var APP_VERSION='v13 · 16.09.2026';
+var APP_VERSION='v14 · 19.09.2026';
 /* Kennzeichen des Excel-Stands. Wird nach dem einmaligen Übernehmen in den
    Einstellungen vermerkt, damit es nicht bei jedem Start erneut passiert. */
 var XL_STAND='martin-arbeitszeit-bezahlt-bis-2026-07-25';
@@ -1789,6 +1789,7 @@ function sheetForm(){
     b+='<div class="calc" id="calc"></div>';
     b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Seriennummer, Verwendungszweck, Garantie …">'+esc(g('notiz','notiz'))+'</textarea></div>';
     var actsA='<div class="acts">'
+      +'<button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
       +(ui.editId?'<button class="btn btn-line" style="color:var(--red)" onclick="A.trashEntry()">Papierkorb</button>':'')
       +'<button class="btn btn-fill" onclick="A.saveForm()">Speichern</button></div>';
     return shell(ui.editId?'Ausgabe bearbeiten':'Neue Betriebsausgabe',b,actsA);
@@ -1887,6 +1888,7 @@ function sheetForm(){
   b+='<div class="f"><label>Notiz</label><textarea id="f-notiz" placeholder="Besonderheiten, Absprachen …">'+esc(g('notiz','notiz'))+'</textarea></div>';
 
   var acts='<div class="acts">'
+    +'<button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
     +(ui.editId?'<button class="btn btn-line" style="color:var(--red)" onclick="A.trashEntry()">Papierkorb</button>':'')
     +'<button class="btn btn-fill" onclick="A.saveForm()">Speichern</button></div>';
   return shell(ui.editId?'Bearbeiten':(ui.fArea==='self'?'Neuer Auftrag':'Neuer Eintrag'),b,acts);
@@ -1940,7 +1942,8 @@ function sheetSettings(){
     +'<button class="btn btn-line btn-sm" id="updbtn" onclick="A.aktualisieren()">Auf neue Fassung prüfen</button>'
     +'<div class="hint" style="margin-top:8px">Holt die Programmdateien frisch vom Server. '
     +'Deine Einträge bleiben dabei unangetastet.</div></div>';
-  var acts='<div class="acts"><button class="btn btn-fill" onclick="A.saveSettingsForm()">Speichern</button></div>';
+  var acts='<div class="acts"><button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
+    +'<button class="btn btn-fill" onclick="A.saveSettingsForm()">Speichern</button></div>';
   return shell('Sätze &amp; Einstellungen',b,acts);
 }
 
@@ -2294,6 +2297,7 @@ function sheetRg(){
     +'<textarea id="rg-notiz">'+esc(r.notiz)+'</textarea></div>';
 
   var acts='<div class="acts">'
+    +'<button class="btn btn-line" onclick="A.closeSheet()">Abbrechen</button>'
     +(ui.rgId?'<button class="btn btn-line" style="color:var(--red)" onclick="A.trashRg()">Papierkorb</button>':'')
     +'<button class="btn btn-line" onclick="A.vorschauRg()">Vorschau</button>'
     +'<button class="btn btn-fill" onclick="A.saveRg()">Speichern</button></div>';
@@ -2312,12 +2316,13 @@ function steuerZeile(e,text){
 /* Unter dem Schlusstext: was die App an Platzhaltern einsetzt. Alles andere
    am Text bestimmst du – es gibt keine fest eingebaute Grußformel mehr. */
 function platzhalterHilfe(){
-  return '<div class="hint" style="margin-top:6px">Alles hier ist frei – auch die Grußformel. '
-    +'Was du einsetzen kannst, füllt die App beim Drucken aus:<br>'
+  return '<div class="hint platzhalter">Alles hier ist frei – auch die Grußformel. '
+    +'Zeilenumbrüche bleiben, wie du sie schreibst. Diese Kürzel füllt die App beim Drucken aus:'
+    +'<span class="platzliste">'
     + RG_PLATZ.map(function(x){
-        return '<code>'+esc(x[0])+'</code> '+esc(x[1]);
-      }).join(' · ')
-    +'<br>Zeilenumbrüche bleiben so, wie du sie schreibst.</div>';
+        return '<span><code>'+esc(x[0])+'</code> '+esc(x[1])+'</span>';
+      }).join('')
+    +'</span></div>';
 }
 
 function rgPosHTML(p,i,n){
@@ -2934,18 +2939,10 @@ function zeile(x){ return x?esc(x)+'<br>':''; }
 /* Platzhalter im Schlusstext. Der Text selbst gehört dir – die App setzt
    nur ein, was sie ohnehin weiß. */
 var RG_PLATZ=[
-  ['{betrag}',     'zu zahlender Betrag'],
-  ['{summe}',      'Summe der Leistungen'],
-  ['{anzahlung}',  'bereits gezahlte Anzahlung'],
-  ['{faellig}',    'Zahlungsziel als Datum'],
-  ['{nummer}',     'Rechnungsnummer'],
-  ['{datum}',      'Rechnungsdatum'],
-  ['{kunde}',      'Name des Kunden'],
-  ['{name}',       'dein Name'],
-  ['{kontoinhaber}','Kontoinhaber'],
-  ['{iban}',       'IBAN'],
-  ['{bic}',        'BIC'],
-  ['{bank}',       'Bank']
+  ['{betrag}','zu zahlen'], ['{summe}','Summe'], ['{anzahlung}','Anzahlung'],
+  ['{faellig}','Fälligkeit'], ['{nummer}','Nummer'], ['{datum}','Datum'],
+  ['{kunde}','Kunde'], ['{name}','dein Name'],
+  ['{kontoinhaber}','Inhaber'], ['{iban}','IBAN'], ['{bic}','BIC'], ['{bank}','Bank']
 ];
 function rgWerte(r){
   var f=Object.assign({},DEF_FIRMA,settings.firma||{});
@@ -3187,6 +3184,26 @@ function resetLock(){
 
 /* ============ rahmen ============ */
 
+/* Wie hoch ein Blatt höchstens werden darf. Auf dem Handy ist 100vh größer
+   als das, was man sieht – die Adressleiste und die eingeblendete Tastatur
+   zählen dort nicht mit. visualViewport kennt den wahren sichtbaren Bereich;
+   ohne diese Schnittstelle greifen die Rückfälle aus app.css. */
+function sheetHoehe(){
+  var vv=window.visualViewport;
+  if(!vv) return;
+  document.documentElement.style.setProperty('--sheetmax', Math.round(vv.height*0.88)+'px');
+}
+
+/* Den ausgewählten Monat bzw. das Jahr in den Blick rücken – sonst steht der
+   laufende Monat auf dem Handy außerhalb der Leiste. */
+function chipsZeigen(){
+  document.querySelectorAll('.chips').forEach(function(c){
+    var on=c.querySelector('.chip.on');
+    if(!on || c.scrollWidth<=c.clientWidth) return;
+    c.scrollLeft=Math.max(0, on.offsetLeft-(c.clientWidth-on.offsetWidth)/2);
+  });
+}
+
 /* Nach Anlegen und nach jedem Entsperren auf der Startseite beginnen. */
 function boot(){
   ui.view='home'; ui.month=curMk(); ui.jahr=curY(); ui.modus='monat';
@@ -3213,6 +3230,8 @@ function render(){
   if(ui.sheet==='form') liveCalc();
   if(ui.sheet==='abo') aboCalc();
   if(ui.sheet==='rg') rgCalc();
+  chipsZeigen();
+  sheetHoehe();
   resetLock();
 }
 
@@ -3257,7 +3276,19 @@ function start(){
   ['click','keydown','pointerdown'].forEach(function(ev){
     document.addEventListener(ev,resetLock,{passive:true});
   });
-  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&ui.repOffen) closeReport(); });
+  document.addEventListener('keydown',function(e){
+    if(e.key!=='Escape') return;
+    if(ui.repOffen) closeReport();
+    else if(ui.sheet) closeSheet();
+  });
+  /* Blattgröße nachführen, wenn die Adressleiste ein- oder ausfährt oder die
+     Tastatur aufgeht. */
+  if(window.visualViewport){
+    window.visualViewport.addEventListener('resize',sheetHoehe);
+    window.visualViewport.addEventListener('scroll',sheetHoehe);
+  }
+  window.addEventListener('orientationchange',function(){ setTimeout(sheetHoehe,250); });
+  sheetHoehe();
   document.getElementById('reportprint').addEventListener('click',function(){window.print();});
   document.getElementById('reportback').addEventListener('click',closeReport);
 
