@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tamara &amp; Christopher · 24.10.2026</title>
+<meta name="description" content="Teilt eure Fotos und Videos von unserer Hochzeit.">
+<meta name="theme-color" content="#F7F3EC">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='46' font-size='40' text-anchor='middle' font-family='Georgia' fill='%23A08455'%3ET%26C%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Pinyon+Script&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+
+<header class="hero" id="hero">
+  <div class="hero-inner">
+    <p class="kicker">Wir heiraten</p>
+    <h1 class="names">
+      <span id="n1">Tamara</span>
+      <span class="amp">&amp;</span>
+      <span id="n2">Christopher</span>
+    </h1>
+    <p class="date" id="datum">24 · 10 · 2026</p>
+    <p class="date-long" id="datum-lang">Samstag, 24. Oktober 2026</p>
+    <p class="ort" id="ort" hidden></p>
+    <p class="countdown" id="countdown" hidden></p>
+    <a class="btn btn-hero" href="#teilen">Fotos &amp; Videos teilen</a>
+  </div>
+</header>
+
+<main>
+  <section class="intro" id="intro">
+    <div class="ornament" aria-hidden="true">
+      <svg viewBox="0 0 120 12"><path d="M0 6h50M70 6h50" stroke="currentColor" stroke-width=".8"/><circle cx="60" cy="6" r="3" fill="none" stroke="currentColor" stroke-width=".8"/></svg>
+    </div>
+    <p class="begruessung" id="begruessung"></p>
+    <div class="fotoreihe" id="fotoreihe" hidden></div>
+  </section>
+
+  <section class="teilen" id="teilen">
+    <h2>Eure Momente</h2>
+    <p class="lead">Ihr habt schöne Fotos oder kurze Videos gemacht? Ladet sie hier hoch –
+      wir freuen uns über jeden Blick durch eure Augen.</p>
+
+    <div class="banner" id="demo-banner" hidden>
+      <strong>Vorschau-Modus.</strong> Noch kein Cloud-Speicher eingetragen –
+      das Hochladen wird nur vorgespielt, es wird nichts gespeichert.
+    </div>
+
+    <!-- Gäste-Code (nur wenn in config.js gesetzt und nicht über den Link mitgegeben) -->
+    <form class="card" id="code-form" hidden>
+      <label for="code">Gäste-Code</label>
+      <p class="hint">Steht auf der Karte an eurem Tisch.</p>
+      <div class="row">
+        <input id="code" type="text" autocomplete="off" autocapitalize="characters" inputmode="text">
+        <button class="btn" type="submit">Weiter</button>
+      </div>
+      <p class="error" id="code-error" hidden>Dieser Code stimmt leider nicht.</p>
+    </form>
+
+    <div class="card" id="upload-card" hidden>
+      <label for="gastname">Euer Name <span class="optional">(freiwillig)</span></label>
+      <p class="hint">Damit das Brautpaar weiß, von wem die Bilder sind.</p>
+      <input id="gastname" type="text" autocomplete="name" maxlength="60" placeholder="z. B. Anna &amp; Lukas">
+
+      <div class="drop" id="drop">
+        <input id="files" type="file" accept="image/*,video/*" multiple hidden>
+        <button class="btn btn-big" type="button" id="pick">Fotos &amp; Videos auswählen</button>
+        <p class="hint drop-hint">oder hierher ziehen · Fotos bis <span id="max-bild">10</span> MB, Videos bis <span id="max-video">100</span> MB</p>
+      </div>
+
+      <div class="summary" id="summary" hidden></div>
+      <ul class="queue" id="queue"></ul>
+      <button class="btn btn-line" type="button" id="retry" hidden>Fehlgeschlagene erneut versuchen</button>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <p><span id="f-names">Tamara &amp; Christopher</span> · <span id="f-date">24.10.2026</span></p>
+</footer>
+
+<script src="config.js?v=1"></script>
+<script src="app.js?v=1"></script>
+</body>
+</html>

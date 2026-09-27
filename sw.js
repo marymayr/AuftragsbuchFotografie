@@ -34,6 +34,8 @@ self.addEventListener('fetch', function (e) {
   if (e.request.method !== 'GET') return;
   var url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;
+  /* Die Hochzeitsseite im Unterordner ist eine eigene Seite – nicht mitspeichern. */
+  if (url.pathname.indexOf('/hochzeit/') !== -1) return;
 
   var merken = function (res) {
     if (res && res.ok) {
